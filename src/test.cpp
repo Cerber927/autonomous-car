@@ -12,8 +12,8 @@ const uint8_t R_PWM = 5;
 
 float pidI = 0;
 float prevError = 0;
-const float kp = 0.01;   // Proportional gain
-const float ki = 0;     // Integral gain
+const float kp = 0.1;   // Proportional gain
+const float ki = 0.01;     // Integral gain
 const float kd = 0;     // Derivative gain
 const float pidMin = -100; // Minimum PID output
 const float pidMax = 100; // Maximum PID output
@@ -21,7 +21,7 @@ const float pidMax = 100; // Maximum PID output
 AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
 BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
 
-int pid(int setpoint, int current);
+float pid(int setpoint, float current);
 void motorControl(float pidOutput);
 
 int setpoint = 0;
@@ -74,34 +74,43 @@ void loop()
   float rpm = abs((deltaAngle / deltaTime / 6) * 1000000);
   // todo
   // if the car is not moving, rpm can be very big, current setpoint can be bigger than 255. But actually it does not move
-  int currentValue = (int) (0.02309 * rpm + 3.577);
+  float currentValue = 0.02309 * rpm + 3.577;
   if (currentValue > 255) {
     currentValue = 0;
   }
   
-  int pidOutput = pid(setpoint, currentValue);
+  float pidOutput = pid(setpoint, currentValue);
   Serial.print("pidOutput : ");
   Serial.println(pidOutput);
 
-  setpoint = constrain(setpoint + pidOutput, 20, 120);
+  int targetSetpoint = (int) constrain(currentValue + pidOutput, 20, 120);
   Serial.print("setpoint : ");
   Serial.println(setpoint);
 
-  motorController.TurnLeft(setpoint);
+  motorController.TurnLeft(targetSetpoint);
 
   prevAngle = currentAngle;
   prevTime = currentTime;
 }
 
-int pid(int setpoint, int current)
+float pid(int setpoint, float current)
 {
-  int error = setpoint - current;
-  pidI += ki * error;
-  pidI = constrain(pidI, pidMin, pidMax);
-  int deltaError = error - prevError;
+  float error = (float) setpoint - current;
+  if (abs(error) < 1){
+    pidI += ki * error;
+    pidI = constrain(pidI, -1, 1);
+    Serial.print("pid i : ");
+    Serial.println(pidI);
+  }
+  else{
+    pidI = 0;
+  }
+  
+  float deltaError = error - prevError;
   Serial.print("error: ");
   Serial.println(error);
-  int pidOutput = kp * error + pidI + kd * deltaError;
+  float pidOutput = kp * error + pidI + kd * deltaError;
+  // float pidOutput = kp * error;
   pidOutput = constrain(pidOutput, pidMin, pidMax);
   prevError = error;
   return pidOutput;
