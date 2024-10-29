@@ -10,11 +10,24 @@ const uint8_t R_EN = 4;
 const uint8_t L_PWM = 6;
 const uint8_t R_PWM = 5;
 
+float pidI = 0;
+float prevError = 0;
+const float kp = 1.0;   // Proportional gain
+const float ki = 0;     // Integral gain
+const float kd = 0;     // Derivative gain
+const float pidMax = 0; // Maximum PID output
+const float pidMin = 0; // Minimum PID output
+
 AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
 BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
 
+float pid(float setpoint, float current);
+void motorControl(float pidOutput);
+
+int setpoint = 0;
 float prevAngle = 0;
 unsigned long prevTime = 0;
+float deltaAngle = 0;
 
 void setup()
 {
@@ -34,13 +47,24 @@ void setup()
 
 void loop()
 {
+  setpoint = 120;
+
   float currentAngle = as5047p.readAngleDegree();
   unsigned long currentTime = micros();
 
-  float deltaAngle = currentAngle - prevAngle;
-  unsigned long deltaTime = currentAngle - prevTime;
+  if (currentAngle < prevAngle)
+  {
+    deltaAngle = currentAngle - prevAngle;
+  }
+  else
+  {
+    deltaAngle = currentAngle - prevAngle - 360;
+  }
 
-  float rpm = (deltaAngle / (deltaTime / 6)) * 1000000;
+  unsigned long deltaTime = currentTime - prevTime;
+  float rpm = (deltaAngle / deltaTime / 6) * 1000000;
+  Serial.println(rpm);
+  motorController.TurnLeft(setpoint);
 
   prevAngle = currentAngle;
   prevTime = currentTime;
@@ -49,10 +73,14 @@ void loop()
 float pid(float setpoint, float current)
 {
   float error = setpoint - current;
-  // implement PID control here
-  float output = 0;
+  pidI += ki * error;
+  pidI = constrain(pidI, pidMin, pidMax);
+  float deltaError = error - prevError;
+  float pidOutput = kp * error + pidI + kd * deltaError;
+  pidOutput = constrain(pidOutput, pidMin, pidMax);
+  prevError = error;
 
-  return output;
+  return pidOutput;
 }
 
 void motorControl(float pidOutput)
