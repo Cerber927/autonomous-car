@@ -47,27 +47,33 @@ void setup()
 
 void loop()
 {
-  setpoint = 120;
-
-  float currentAngle = as5047p.readAngleDegree();
-  unsigned long currentTime = micros();
-
-  if (currentAngle < prevAngle)
+  
+  if (Serial.available() > 0)
   {
-    deltaAngle = currentAngle - prevAngle;
+    setpoint = Serial.parseInt();
+    Serial.println(setpoint);
   }
-  else
-  {
-    deltaAngle = currentAngle - prevAngle - 360;
-  }
+  Serial.println("tttt");
 
-  unsigned long deltaTime = currentTime - prevTime;
-  float rpm = (deltaAngle / deltaTime / 6) * 1000000;
-  Serial.println(rpm);
-  motorController.TurnLeft(setpoint);
+  // float currentAngle = as5047p.readAngleDegree();
+  // unsigned long currentTime = micros();
 
-  prevAngle = currentAngle;
-  prevTime = currentTime;
+  // if (currentAngle < prevAngle)
+  // {
+  //   deltaAngle = currentAngle - prevAngle;
+  // }
+  // else
+  // {
+  //   deltaAngle = currentAngle - prevAngle - 360;
+  // }
+
+  // unsigned long deltaTime = currentTime - prevTime;
+  // float rpm = (deltaAngle / deltaTime / 6) * 1000000;
+  // Serial.println(rpm);
+  // motorController.TurnLeft(setpoint);
+
+  // prevAngle = currentAngle;
+  // prevTime = currentTime;
 }
 
 float pid(float setpoint, float current)
