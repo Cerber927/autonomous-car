@@ -144,20 +144,15 @@ float noiseSmooth(float rpm)
 
 void runForward(int signal)
 {
-  motorController.TurnLeft(signal);
+  motorController.TurnRight(signal);
 }
 
 void runBackward(int signal)
 {
-  motorController.TurnRight(signal);
+  motorController.TurnLeft(signal);
 }
 
 void stop()
 {
   motorController.Stop();
-}
-
-void motorControl(float pidOutput)
-{
-  // implement motor control here
 }
