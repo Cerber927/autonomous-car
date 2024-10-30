@@ -25,6 +25,7 @@ BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
 float pid(int setpoint, float current);
 void motorControl(float pidOutput);
 float handleRollover(float deltaAngle);
+float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
 
 int setpoint = 0;
 float prevAngle = 0;
