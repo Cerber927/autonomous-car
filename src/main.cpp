@@ -40,7 +40,7 @@ float readings[windowSize];      // Array to store sensor readings
 int currentIndex = 0;            // Current index in the readings array
 float sum = 711.7 * windowSize; // Sum of the readings in the window
 
-// detecte the distance of the car
+// How far should the car move, later we can read from the serial monitor
 double distance = 2;         // After 2 meters the motor stops
 
 void setup()
@@ -172,9 +172,9 @@ void detectDistance(double distance, float currentAngle, float prevAngle) {
     stop();
   }
 
-  // Forward rotation: angle wraps from ~360 to ~0
+  // If the angle of the motor surpasses 360 or 0 degree, than distance decreases
   if ((prevAngle > 300 && currentAngle < 60) || (prevAngle < 60 && currentAngle > 300)) {
-    distance -= 0.0117647058823529;  // Increment rotation count for forward rotation
+    distance -= 0.0117647058823529; // For one rotation of the motor, the car moves 0.0117647m
 
   }
 
