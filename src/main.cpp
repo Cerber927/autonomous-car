@@ -70,11 +70,6 @@ void loop()
   unsigned long deltaTime = currentTime - prevTime;
 
   float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
-  // if the car is not moving then the delta angle is 0 which make the rpm 0 so do we need this check?
-  // if (currentValue > 255)
-  // {
-  //   currentValue = 0;
-  // }
 
   float pidOutput = pid(setpoint, currentSpeed);
   Serial.print("pidOutput : ");
@@ -145,6 +140,21 @@ float noiseSmooth(float rpm)
   // Calculate the average value over the window
   float averageValue = sum / (float)windowSize;
   return averageValue;
+}
+
+void runForward(int signal)
+{
+  motorController.TurnLeft(signal);
+}
+
+void runBackward(int signal)
+{
+  motorController.TurnRight(signal);
+}
+
+void stop()
+{
+  motorController.Stop();
 }
 
 void motorControl(float pidOutput)
