@@ -29,15 +29,19 @@ float noiseSmooth(float rpm);
 void runForward(int signal);
 void runBackward(int signal);
 void stop();
+void detectDistance(double distance, float currentAngle, float prevAngle);
 
-int setpoint = 0;
+int setpoint = 20;
 float prevAngle = 0;
 unsigned long prevTime = 0;
 
-const int windowSize = 100;
+const int windowSize = 10;
 float readings[windowSize];      // Array to store sensor readings
 int currentIndex = 0;            // Current index in the readings array
-double sum = 711.7 * windowSize; // Sum of the readings in the window
+float sum = 711.7 * windowSize; // Sum of the readings in the window
+
+// detecte the distance of the car
+double distance = 2;         // After 2 meters the motor stops
 
 void setup()
 {
@@ -68,6 +72,8 @@ void loop()
 
   float currentAngle = as5047p.readAngleDegree();
   unsigned long currentTime = micros();
+  
+  // detectDistance(distance, currentAngle, prevAngle);
 
   float deltaAngle = handleRollover(currentAngle - prevAngle);
 
@@ -159,4 +165,17 @@ void runBackward(int signal)
 void stop()
 {
   motorController.Stop();
+}
+
+void detectDistance(double distance, float currentAngle, float prevAngle) {
+  if (distance <= 0){
+    stop();
+  }
+
+  // Forward rotation: angle wraps from ~360 to ~0
+  if ((prevAngle > 300 && currentAngle < 60) || (prevAngle < 60 && currentAngle > 300)) {
+    distance -= 0.0117647058823529;  // Increment rotation count for forward rotation
+
+  }
+
 }
