@@ -23,11 +23,19 @@ BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
 
 float pid(int setpoint, float current);
 void motorControl(float pidOutput);
+float noiseSmooth(float rpm);
 
-int setpoint = 0;
+int setpoint = 20;  // when the code starts, the car runs at speed 20
 float prevAngle = 0;
 unsigned long prevTime = 0;
 float deltaAngle = 0;
+
+// Used in the window function to smooth the noise
+const int windowSize = 100;
+float readings[windowSize];  // Array to store sensor readings
+int currentIndex = 0;      // Current index in the readings array
+double sum = 711.7 * windowSize;              // Sum of the readings in the window
+
 
 void setup()
 {
@@ -43,6 +51,11 @@ void setup()
 
   prevAngle = as5047p.readAngleDegree();
   prevTime = micros();
+
+  // initialize the window function
+  for (int i = 0; i < windowSize; i++) {
+    readings[i] = 711.7;  // when the speed of the motor = 20, rpm is roughly 711.7.
+  }
 }
 
 void loop()
@@ -72,6 +85,10 @@ void loop()
 
   unsigned long deltaTime = currentTime - prevTime;
   float rpm = abs((deltaAngle / deltaTime / 6) * 1000000);
+
+  // call noiseSmooth here
+  // rpm = noiseSmooth(rpm);
+
   // todo
   // if the car is not moving, rpm can be very big, current setpoint can be bigger than 255. But actually it does not move
   float currentValue = 0.02309 * rpm + 3.577;
@@ -114,6 +131,17 @@ float pid(int setpoint, float current)
   pidOutput = constrain(pidOutput, pidMin, pidMax);
   prevError = error;
   return pidOutput;
+}
+
+float noiseSmooth(float rpm)
+{
+  sum = sum - readings[currentIndex] + rpm;
+  readings[currentIndex] = rpm;
+  // Increment the index and wrap around if necessary
+  currentIndex = (currentIndex + 1) % windowSize;
+  // Calculate the average value over the window
+  float averageValue = sum / (float)windowSize;
+  return averageValue;
 }
 
 void motorControl(float pidOutput)
