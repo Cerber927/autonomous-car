@@ -23,9 +23,12 @@ AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
 BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
 
 float pid(int setpoint, float current);
-void motorControl(float pidOutput);
 float handleRollover(float deltaAngle);
 float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
+float noiseSmooth(float rpm);
+void runForward(int signal);
+void runBackward(int signal);
+void stop();
 
 int setpoint = 0;
 float prevAngle = 0;
