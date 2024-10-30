@@ -4,6 +4,7 @@
 
 #define AS5047P_CHIP_SELECT_PORT 10
 #define AS5047P_CUSTOM_SPI_BUS_SPEED 100000
+#define DEGREES_PER_REVOLUTION 360
 
 const uint8_t L_EN = 3;
 const uint8_t R_EN = 4;
@@ -12,22 +13,27 @@ const uint8_t R_PWM = 5;
 
 float pidI = 0;
 float prevError = 0;
-const float kp = 1.0;   // Proportional gain
-const float ki = 0;     // Integral gain
-const float kd = 0;     // Derivative gain
-const float pidMax = 0; // Maximum PID output
-const float pidMin = 0; // Minimum PID output
+const float kp = 0.1;      // Proportional gain
+const float ki = 0.01;     // Integral gain
+const float kd = 0;        // Derivative gain
+const float pidMin = -100; // Minimum PID output
+const float pidMax = 100;  // Maximum PID output
 
 AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
 BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
 
-float pid(float setpoint, float current);
+float pid(int setpoint, float current);
 void motorControl(float pidOutput);
+float handleRollover(float deltaAngle);
 
 int setpoint = 0;
 float prevAngle = 0;
 unsigned long prevTime = 0;
-float deltaAngle = 0;
+
+const int windowSize = 100;
+float readings[windowSize];      // Array to store sensor readings
+int currentIndex = 0;            // Current index in the readings array
+double sum = 711.7 * windowSize; // Sum of the readings in the window
 
 void setup()
 {
@@ -47,46 +53,98 @@ void setup()
 
 void loop()
 {
-  
   if (Serial.available() > 0)
   {
-    setpoint = Serial.parseInt();
-    Serial.println(setpoint);
+    int newSetpoint = Serial.parseInt();
+    if (newSetpoint != 0) // Prevent unintended reset to 0
+    {
+      setpoint = newSetpoint;
+    }
   }
-  Serial.println("tttt");
 
-  // float currentAngle = as5047p.readAngleDegree();
-  // unsigned long currentTime = micros();
+  float currentAngle = as5047p.readAngleDegree();
+  unsigned long currentTime = micros();
 
-  // if (currentAngle < prevAngle)
+  float deltaAngle = handleRollover(currentAngle - prevAngle);
+
+  unsigned long deltaTime = currentTime - prevTime;
+
+  float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
+  // if the car is not moving then the delta angle is 0 which make the rpm 0 so do we need this check?
+  // if (currentValue > 255)
   // {
-  //   deltaAngle = currentAngle - prevAngle;
-  // }
-  // else
-  // {
-  //   deltaAngle = currentAngle - prevAngle - 360;
+  //   currentValue = 0;
   // }
 
-  // unsigned long deltaTime = currentTime - prevTime;
-  // float rpm = (deltaAngle / deltaTime / 6) * 1000000;
-  // Serial.println(rpm);
-  // motorController.TurnLeft(setpoint);
+  float pidOutput = pid(setpoint, currentSpeed);
+  Serial.print("pidOutput : ");
+  Serial.println(pidOutput);
 
-  // prevAngle = currentAngle;
-  // prevTime = currentTime;
+  int targetSetpoint = (int)constrain(currentSpeed + pidOutput, 20, 120);
+  Serial.print("setpoint : ");
+  Serial.println(setpoint);
+
+  motorController.TurnLeft(targetSetpoint);
+
+  prevAngle = currentAngle;
+  prevTime = currentTime;
 }
 
-float pid(float setpoint, float current)
+float pid(int setpoint, float current)
 {
-  float error = setpoint - current;
-  pidI += ki * error;
-  pidI = constrain(pidI, pidMin, pidMax);
+  float error = (float)setpoint - current;
+  // TODO: is there more better way to handle the noise
+  if (abs(error) < 1)
+  {
+    pidI += ki * error;
+    pidI = constrain(pidI, -1, 1);
+    Serial.print("pid i : ");
+    Serial.println(pidI);
+  }
+  else
+  {
+    pidI = 0;
+  }
+
   float deltaError = error - prevError;
+  Serial.print("error: ");
+  Serial.println(error);
   float pidOutput = kp * error + pidI + kd * deltaError;
   pidOutput = constrain(pidOutput, pidMin, pidMax);
   prevError = error;
-
   return pidOutput;
+}
+
+float handleRollover(float deltaAngle)
+{
+  if (deltaAngle < -DEGREES_PER_REVOLUTION / 2)
+  {
+    deltaAngle += DEGREES_PER_REVOLUTION;
+  }
+  else if (deltaAngle > DEGREES_PER_REVOLUTION / 2)
+  {
+    deltaAngle -= DEGREES_PER_REVOLUTION;
+  }
+
+  return deltaAngle;
+}
+
+float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime)
+{
+  float rpm = abs((deltaAngle / deltaTime / 6) * 1000000);
+  float current = 0.02309 * rpm + 3.577;
+  return current;
+}
+
+float noiseSmooth(float rpm)
+{
+  sum = sum - readings[currentIndex] + rpm;
+  readings[currentIndex] = rpm;
+  // Increment the index and wrap around if necessary
+  currentIndex = (currentIndex + 1) % windowSize;
+  // Calculate the average value over the window
+  float averageValue = sum / (float)windowSize;
+  return averageValue;
 }
 
 void motorControl(float pidOutput)
