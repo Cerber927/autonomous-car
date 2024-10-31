@@ -5,6 +5,8 @@
 #define AS5047P_CHIP_SELECT_PORT 10
 #define AS5047P_CUSTOM_SPI_BUS_SPEED 100000
 #define DEGREES_PER_REVOLUTION 360
+#define PRESCALER 64
+#define SAMPLING_FREQUENCY 250
 
 const uint8_t L_EN = 3;
 const uint8_t R_EN = 4;
@@ -18,6 +20,7 @@ const float ki = 0.01;     // Integral gain
 const float kd = 0;        // Derivative gain
 const float pidMin = -100; // Minimum PID output
 const float pidMax = 100;  // Maximum PID output
+int outputSpeed = 20;
 
 AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
 BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
@@ -25,26 +28,25 @@ BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
 float pid(int setpoint, float current);
 float handleRollover(float deltaAngle);
 float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
-float noiseSmooth(float rpm);
 void runForward(int signal);
 void runBackward(int signal);
 void stop();
 void detectDistance(double distance, float currentAngle, float prevAngle);
+void setup_timer();
 
 int setpoint = 20;
 float prevAngle = 0;
 unsigned long prevTime = 0;
 
-const int windowSize = 10;
-float readings[windowSize];      // Array to store sensor readings
-int currentIndex = 0;            // Current index in the readings array
-float sum = 711.7 * windowSize; // Sum of the readings in the window
-
 // How far should the car move, later we can read from the serial monitor
-double distance = 2;         // After 2 meters the motor stops
+double distance = 2; // After 2 meters the motor stops
 
 void setup()
 {
+  setup_timer();
+
+  sei(); // Enable global interrupts
+
   Serial.begin(115200);
 
   while (!as5047p.initSPI())
@@ -72,24 +74,20 @@ void loop()
 
   float currentAngle = as5047p.readAngleDegree();
   unsigned long currentTime = micros();
-  
+
   // detectDistance(distance, currentAngle, prevAngle);
 
   float deltaAngle = handleRollover(currentAngle - prevAngle);
-
-  unsigned long deltaTime = currentTime - prevTime;
+  long deltaTime = currentTime - prevTime;
 
   float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
-
   float pidOutput = pid(setpoint, currentSpeed);
-  Serial.print("pidOutput : ");
-  Serial.println(pidOutput);
+  outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 120);
 
-  int targetSetpoint = (int)constrain(currentSpeed + pidOutput, 20, 120);
   Serial.print("setpoint : ");
   Serial.println(setpoint);
 
-  motorController.TurnLeft(targetSetpoint);
+  motorController.TurnLeft(outputSpeed);
 
   prevAngle = currentAngle;
   prevTime = currentTime;
@@ -98,7 +96,7 @@ void loop()
 float pid(int setpoint, float current)
 {
   float error = (float)setpoint - current;
-  // TODO: is there more better way to handle the noise
+  // TODO: is there more better way to handle this
   if (abs(error) < 1)
   {
     pidI += ki * error;
@@ -141,17 +139,6 @@ float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime)
   return current;
 }
 
-float noiseSmooth(float rpm)
-{
-  sum = sum - readings[currentIndex] + rpm;
-  readings[currentIndex] = rpm;
-  // Increment the index and wrap around if necessary
-  currentIndex = (currentIndex + 1) % windowSize;
-  // Calculate the average value over the window
-  float averageValue = sum / (float)windowSize;
-  return averageValue;
-}
-
 void runForward(int signal)
 {
   motorController.TurnRight(signal);
@@ -167,15 +154,41 @@ void stop()
   motorController.Stop();
 }
 
-void detectDistance(double distance, float currentAngle, float prevAngle) {
-  if (distance <= 0){
+void detectDistance(double distance, float currentAngle, float prevAngle)
+{
+  if (distance <= 0)
+  {
     stop();
   }
 
   // If the angle of the motor surpasses 360 or 0 degree, than distance decreases
-  if ((prevAngle > 300 && currentAngle < 60) || (prevAngle < 60 && currentAngle > 300)) {
+  if ((prevAngle > 300 && currentAngle < 60) || (prevAngle < 60 && currentAngle > 300))
+  {
     distance -= 0.0117647058823529; // For one rotation of the motor, the car moves 0.0117647m
-
   }
-
 }
+
+void setup_timer()
+{
+  TCCR1A = 0; // Set entire TCCR1A register to 0
+  TCCR1B = 0; // Same for TCCR1B
+  TCNT1 = 0;  // Initialize counter value to 0
+
+  OCR1A = SAMPLING_FREQUENCY; // Set the compare match register
+
+  // Set prescaler and mode
+  TCCR1B |= (1 << WGM12);              // CTC mode (Clear Timer on Compare)
+  TCCR1B |= (1 << CS11) | (1 << CS10); // Set prescaler to 64
+
+  // Enable timer compare interrupt
+  TIMSK1 |= (1 << OCIE1A);
+}
+
+// interrupt subroutine, for now it's not used
+
+// ISR(TIMER1_COMPA_vect)
+// {
+//   float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
+//   pidOutput = pid(setpoint, currentSpeed);
+//   outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 120);
+// }
