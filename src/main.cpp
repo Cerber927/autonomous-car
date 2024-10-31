@@ -22,6 +22,14 @@ const float pidMin = -100; // Minimum PID output
 const float pidMax = 100;  // Maximum PID output
 int outputSpeed = 20;
 
+struct Command  // The structure of the command read from the serial monitor
+{
+  int mode;
+  int speed;
+  float distance;
+};
+Command command;
+
 AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
 BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
 
@@ -33,13 +41,10 @@ void runBackward(int signal);
 void stop();
 void detectDistance(double distance, float currentAngle, float prevAngle);
 void setup_timer();
+void parseCommand(String input);
 
-int setpoint = 20;
 float prevAngle = 0;
 unsigned long prevTime = 0;
-
-// How far should the car move, later we can read from the serial monitor
-double distance = 2; // After 2 meters the motor stops
 
 void setup()
 {
@@ -65,32 +70,47 @@ void loop()
 {
   if (Serial.available() > 0)
   {
-    int newSetpoint = Serial.parseInt();
-    if (newSetpoint != 0) // Prevent unintended reset to 0
-    {
-      setpoint = newSetpoint;
-    }
+    String input = Serial.readStringUntil('\n');  // Read the input string until newline, might have some read issue like before
+    parseCommand(input);                          // Parse and store the command
   }
 
   float currentAngle = as5047p.readAngleDegree();
   unsigned long currentTime = micros();
 
-  // detectDistance(distance, currentAngle, prevAngle);
+  // mode = 0 forward, mode = 1 backward, other value stop. by default, no input for mode then mode = 0, moves forward
+  // by default, no input for distance then distance = 0, it runs infinitely.
+  if ((command.mode != 0 && command.mode != 1) || command.distance < 0){
+    stop();
+  }
+  else
+  {
+    float deltaAngle = handleRollover(currentAngle - prevAngle);
+    long deltaTime = currentTime - prevTime;
 
-  float deltaAngle = handleRollover(currentAngle - prevAngle);
-  long deltaTime = currentTime - prevTime;
+    float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
+    float pidOutput = pid(command.speed, currentSpeed);
+    outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 120);
 
-  float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
-  float pidOutput = pid(setpoint, currentSpeed);
-  outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 120);
+    Serial.print("speed : ");
+    Serial.println(command.speed);
 
-  Serial.print("setpoint : ");
-  Serial.println(setpoint);
+    prevAngle = currentAngle;
+    prevTime = currentTime;
 
-  motorController.TurnLeft(outputSpeed);
+    if (command.distance > 0){
+      detectDistance(command.distance, currentAngle, prevAngle);
+    }
 
-  prevAngle = currentAngle;
-  prevTime = currentTime;
+    if (command.mode = 0){        // move forward
+    runForward(outputSpeed);
+    }
+    else if (command.mode = 1)    // move backward
+    {
+      runBackward(outputSpeed);
+    }
+
+  }
+
 }
 
 float pid(int setpoint, float current)
@@ -192,3 +212,26 @@ void setup_timer()
 //   pidOutput = pid(setpoint, currentSpeed);
 //   outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 120);
 // }
+
+void parseCommand(String input) {
+    // Split string based on commas
+    int modeIndex = input.indexOf("mode:");
+    int speedIndex = input.indexOf("speed:");
+    int distanceIndex = input.indexOf("distance:");
+    
+    if (modeIndex != -1) {
+        int endIndex = input.indexOf(',', modeIndex);
+        command.mode = input.substring(modeIndex + 5, endIndex).toInt();
+    }
+
+    if (speedIndex != -1) {
+        int endIndex = input.indexOf(',', speedIndex);
+        command.speed = input.substring(speedIndex + 6, endIndex).toInt();
+        command.speed = constrain(command.speed, 20, 120);    // the speed of motor should be in the range of (20, 120)
+    }
+
+    if (distanceIndex != -1) {
+        int endIndex = input.length();
+        command.distance = input.substring(distanceIndex + 9, endIndex).toFloat();
+    }
+}
