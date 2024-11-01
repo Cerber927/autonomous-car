@@ -184,7 +184,7 @@ void detectDistance(double distance, float currentAngle, float prevAngle)
   // If the angle of the motor surpasses 360 or 0 degree, than distance decreases
   if ((prevAngle > 300 && currentAngle < 60) || (prevAngle < 60 && currentAngle > 300))
   {
-    distance -= 0.0117647058823529; // For one rotation of the motor, the car moves 0.0117647m
+    distance -= 0.0235294117647059; // For one rotation of the motor, the car moves 0.0117647m
   }
 }
 
