@@ -8,6 +8,10 @@
 #define PRESCALER 64
 #define SAMPLING_FREQUENCY 250
 
+#define STOP 0
+#define FORWARD 1
+#define BACKWARD 2
+
 const uint8_t L_EN = 3;
 const uint8_t R_EN = 4;
 const uint8_t L_PWM = 6;
@@ -22,7 +26,7 @@ const float pidMin = -100; // Minimum PID output
 const float pidMax = 100;  // Maximum PID output
 int outputSpeed = 20;
 
-struct Command  // The structure of the command read from the serial monitor
+struct Command // The structure of the command read from the serial monitor
 {
   int mode;
   int speed;
@@ -39,7 +43,7 @@ float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
 void runForward(int signal);
 void runBackward(int signal);
 void stop();
-void detectDistance(double distance, float currentAngle, float prevAngle);
+void passDistance(double distance, float currentAngle, float prevAngle);
 void setup_timer();
 void parseCommand(String input);
 
@@ -60,6 +64,8 @@ void setup()
     delay(5000);
   }
 
+  command.mode = STOP;
+
   motorController.Enable();
 
   prevAngle = as5047p.readAngleDegree();
@@ -70,68 +76,51 @@ void loop()
 {
   if (Serial.available() > 0)
   {
-    String input = Serial.readStringUntil('\n');  // Read the input string until newline, might have some read issue like before
-    parseCommand(input);                          // Parse and store the command
+    String input = Serial.readStringUntil('\n'); // Read the input string until newline, might have some read issue like before
+    parseCommand(input);                         // Parse and store the command
   }
 
   float currentAngle = as5047p.readAngleDegree();
   unsigned long currentTime = micros();
 
-  // mode = 0 forward, mode = 1 backward, other value stop. by default, no input for mode then mode = 0, moves forward
+  float deltaAngle = handleRollover(currentAngle - prevAngle);
+  long deltaTime = currentTime - prevTime;
+
+  float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
+  float pidOutput = pid(command.speed, currentSpeed);
+  outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 120);
+
+  // mode has priority, if the mode is STOP, then the car stops no matter what other parameters are
   // by default, no input for distance then distance = 0, it runs infinitely.
-  if ((command.mode != 0 && command.mode != 1) || command.distance < 0){
+  if (command.mode == STOP)
+  {
     stop();
   }
   else
   {
-    float deltaAngle = handleRollover(currentAngle - prevAngle);
-    long deltaTime = currentTime - prevTime;
-
-    float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
-    float pidOutput = pid(command.speed, currentSpeed);
-    outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 120);
-
-    Serial.print("speed : ");
-    Serial.println(command.speed);
-
-    prevAngle = currentAngle;
-    prevTime = currentTime;
-
-    if (command.distance > 0){
-      detectDistance(command.distance, currentAngle, prevAngle);
+    if (command.mode == FORWARD)
+    {
+      runForward(outputSpeed);
     }
-
-    if (command.mode = 0){        // move forward
-    runForward(outputSpeed);
-    }
-    else if (command.mode = 1)    // move backward
+    else if (command.mode == BACKWARD) // move backward
     {
       runBackward(outputSpeed);
     }
-
+    if (command.distance > 0)
+    {
+      passDistance(command.distance, currentAngle, prevAngle);
+    }
   }
-
+  prevAngle = currentAngle;
+  prevTime = currentTime;
 }
 
 float pid(int setpoint, float current)
 {
   float error = (float)setpoint - current;
-  // TODO: is there more better way to handle this
-  if (abs(error) < 1)
-  {
-    pidI += ki * error;
-    pidI = constrain(pidI, -1, 1);
-    Serial.print("pid i : ");
-    Serial.println(pidI);
-  }
-  else
-  {
-    pidI = 0;
-  }
-
+  pidI += ki * error;
+  pidI = constrain(pidI, -1, 1); // the limiting between -1 and 1 basically means that integral part has no effect on the output
   float deltaError = error - prevError;
-  Serial.print("error: ");
-  Serial.println(error);
   float pidOutput = kp * error + pidI + kd * deltaError;
   pidOutput = constrain(pidOutput, pidMin, pidMax);
   prevError = error;
@@ -174,11 +163,11 @@ void stop()
   motorController.Stop();
 }
 
-void detectDistance(double distance, float currentAngle, float prevAngle)
+void passDistance(double distance, float currentAngle, float prevAngle)
 {
   if (distance <= 0)
   {
-    stop();
+    command.mode = STOP;
   }
 
   // If the angle of the motor surpasses 360 or 0 degree, than distance decreases
@@ -204,6 +193,33 @@ void setup_timer()
   TIMSK1 |= (1 << OCIE1A);
 }
 
+void parseCommand(String input)
+{
+  // Split string based on commas
+  int modeIndex = input.indexOf("mode:");
+  int speedIndex = input.indexOf("speed:");
+  int distanceIndex = input.indexOf("distance:");
+
+  if (modeIndex != -1)
+  {
+    int endIndex = input.indexOf(',', modeIndex);
+    command.mode = input.substring(modeIndex + 5, endIndex).toInt();
+  }
+
+  if (speedIndex != -1)
+  {
+    int endIndex = input.indexOf(',', speedIndex);
+    command.speed = input.substring(speedIndex + 6, endIndex).toInt();
+    command.speed = constrain(command.speed, 20, 120); // the speed of motor should be in the range of (20, 120)
+  }
+
+  if (distanceIndex != -1)
+  {
+    int endIndex = input.length();
+    command.distance = input.substring(distanceIndex + 9, endIndex).toFloat();
+  }
+}
+
 // interrupt subroutine, for now it's not used
 
 // ISR(TIMER1_COMPA_vect)
@@ -212,26 +228,3 @@ void setup_timer()
 //   pidOutput = pid(setpoint, currentSpeed);
 //   outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 120);
 // }
-
-void parseCommand(String input) {
-    // Split string based on commas
-    int modeIndex = input.indexOf("mode:");
-    int speedIndex = input.indexOf("speed:");
-    int distanceIndex = input.indexOf("distance:");
-    
-    if (modeIndex != -1) {
-        int endIndex = input.indexOf(',', modeIndex);
-        command.mode = input.substring(modeIndex + 5, endIndex).toInt();
-    }
-
-    if (speedIndex != -1) {
-        int endIndex = input.indexOf(',', speedIndex);
-        command.speed = input.substring(speedIndex + 6, endIndex).toInt();
-        command.speed = constrain(command.speed, 20, 120);    // the speed of motor should be in the range of (20, 120)
-    }
-
-    if (distanceIndex != -1) {
-        int endIndex = input.length();
-        command.distance = input.substring(distanceIndex + 9, endIndex).toFloat();
-    }
-}
