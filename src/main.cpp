@@ -92,6 +92,12 @@ void loop()
   float pidOutput = pid(command.speed, currentSpeed);
   outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 120);
 
+  Serial.print("Current mode: ");
+  Serial.println(command.mode);
+  Serial.print("Current speed: ");
+  Serial.println(command.speed);
+  Serial.print("Current distance: ");
+  Serial.println(command.distance);
   // mode has priority, if the mode is STOP, then the car stops no matter what other parameters are
   // by default, no input for distance then distance = 0, it runs infinitely.
   if (command.mode == STOP)
