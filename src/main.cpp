@@ -26,7 +26,7 @@ const float ki = 0.01;     // Integral gain
 const float kd = 0;        // Derivative gain
 const float pidMin = -100; // Minimum PID output
 const float pidMax = 100;  // Maximum PID output
-int outputSpeed = 20;
+int outputSpeed = 0;
 
 struct Command // The structure of the command read from the serial monitor
 {
@@ -45,7 +45,7 @@ float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
 void runForward(int signal);
 void runBackward(int signal);
 void stop();
-void passDistance(double distance, float currentAngle, float prevAngle);
+void passDistance(float currentAngle, float prevAngle);
 void setup_timer();
 void parseCommand(String input);
 
@@ -54,9 +54,9 @@ unsigned long prevTime = 0;
 
 void setup()
 {
-  setup_timer();
+  // setup_timer();
 
-  sei(); // Enable global interrupts
+  // sei(); // Enable global interrupts
 
   Serial.begin(115200);
 
@@ -78,8 +78,12 @@ void loop()
 {
   if (Serial.available() > 0)
   {
-    String input = Serial.readStringUntil('\n'); // Read the input string until newline, might have some read issue like before
-    parseCommand(input);                         // Parse and store the command
+    String input = Serial.readStringUntil('\n');
+    if (input) // Prevent unintended reset to 0
+    {
+      Serial.println(input);
+      parseCommand(input);
+    }
   }
 
   float currentAngle = as5047p.readAngleDegree();
@@ -92,12 +96,6 @@ void loop()
   float pidOutput = pid(command.speed, currentSpeed);
   outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 120);
 
-  Serial.print("Current mode: ");
-  Serial.println(command.mode);
-  Serial.print("Current speed: ");
-  Serial.println(command.speed);
-  Serial.print("Current distance: ");
-  Serial.println(command.distance);
   // mode has priority, if the mode is STOP, then the car stops no matter what other parameters are
   // by default, no input for distance then distance = 0, it runs infinitely.
   if (command.mode == STOP)
@@ -116,7 +114,7 @@ void loop()
     }
     if (command.distance > 0)
     {
-      passDistance(command.distance, currentAngle, prevAngle);
+      passDistance(currentAngle, prevAngle);
     }
   }
   prevAngle = currentAngle;
@@ -171,18 +169,20 @@ void stop()
   motorController.Stop();
 }
 
-void passDistance(double distance, float currentAngle, float prevAngle)
+void passDistance(float currentAngle, float prevAngle)
 {
-  if (distance <= 0)
+  // If the angle of the motor surpasses 360 or 0 degree, than distance decreases
+  if ((prevAngle > 300 && currentAngle < 60) || (prevAngle < 60 && currentAngle > 300))
+  {
+    command.distance -= DISTANCE_PER_REVOLUTION; // For one rotation of the motor, the car moves 0.02353m
+    Serial.println(command.distance);
+  }
+
+  if (command.distance <= 0)
   {
     command.mode = STOP;
   }
 
-  // If the angle of the motor surpasses 360 or 0 degree, than distance decreases
-  if ((prevAngle > 300 && currentAngle < 60) || (prevAngle < 60 && currentAngle > 300))
-  {
-    distance -= DISTANCE_PER_REVOLUTION; // For one rotation of the motor, the car moves 0.02353m
-  }
 }
 
 void setup_timer()
@@ -218,7 +218,7 @@ void parseCommand(String input)
   {
     int endIndex = input.indexOf(',', speedIndex);
     command.speed = input.substring(speedIndex + 6, endIndex).toInt();
-    command.speed = constrain(command.speed, 20, 120); // the speed of motor should be in the range of (20, 120)
+    command.speed = constrain(command.speed, 0, 120); // the speed of motor should be in the range of (20, 120)
   }
 
   if (distanceIndex != -1)
@@ -226,6 +226,13 @@ void parseCommand(String input)
     int endIndex = input.length();
     command.distance = input.substring(distanceIndex + 9, endIndex).toFloat();
   }
+
+  Serial.print("Current mode: ");
+  Serial.println(command.mode);
+  Serial.print("Current speed: ");
+  Serial.println(command.speed);
+  Serial.print("Current distance: ");
+  Serial.println(command.distance);
 }
 
 // interrupt subroutine, for now it's not used
