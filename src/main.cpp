@@ -55,9 +55,9 @@ int preMode = STOP;
 
 void setup()
 {
-  // setup_timer();
+  setup_timer();
 
-  // sei(); // Enable global interrupts
+  sei(); // Enable global interrupts
 
   Serial.begin(115200);
 
@@ -184,14 +184,12 @@ void passDistance(float currentAngle, float prevAngle)
   if ((prevAngle > 300 && currentAngle < 60) || (prevAngle < 60 && currentAngle > 300))
   {
     command.distance -= DISTANCE_PER_REVOLUTION; // For one rotation of the motor, the car moves 0.02353m
-    Serial.println(command.distance);
   }
 
   if (command.distance <= 0)
   {
     command.mode = STOP;
   }
-
 }
 
 void setup_timer()
@@ -235,13 +233,6 @@ void parseCommand(String input)
     int endIndex = input.length();
     command.distance = input.substring(distanceIndex + 9, endIndex).toFloat();
   }
-
-  Serial.print("Current mode: ");
-  Serial.println(command.mode);
-  Serial.print("Current speed: ");
-  Serial.println(command.speed);
-  Serial.print("Current distance: ");
-  Serial.println(command.distance);
 }
 
 // interrupt subroutine, for now it's not used
