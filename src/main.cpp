@@ -24,8 +24,8 @@ float prevError = 0;
 const float kp = 0.1;      // Proportional gain
 const float ki = 0.01;     // Integral gain
 const float kd = 0;        // Derivative gain
-const float pidMin = -100; // Minimum PID output
-const float pidMax = 100;  // Maximum PID output
+const float pidMin = -120; // Minimum PID output
+const float pidMax = 120;  // Maximum PID output
 int outputSpeed = 0;
 
 struct Command // The structure of the command read from the serial monitor
@@ -51,6 +51,7 @@ void parseCommand(String input);
 
 float prevAngle = 0;
 unsigned long prevTime = 0;
+int preMode = STOP;
 
 void setup()
 {
@@ -67,6 +68,8 @@ void setup()
   }
 
   command.mode = STOP;
+  command.speed = 0;
+  command.distance = 0;
 
   motorController.Enable();
 
@@ -104,6 +107,11 @@ void loop()
   }
   else
   {
+    // if the mode changes and current mode is not stop, stop first
+    if (command.mode != preMode)
+    {
+      stop();
+    }
     if (command.mode == FORWARD)
     {
       runForward(outputSpeed);
@@ -119,6 +127,7 @@ void loop()
   }
   prevAngle = currentAngle;
   prevTime = currentTime;
+  preMode = command.mode;
 }
 
 float pid(int setpoint, float current)
