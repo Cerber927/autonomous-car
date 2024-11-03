@@ -112,7 +112,7 @@ void loop()
     {
       stop();
     }
-    if (command.mode == FORWARD)
+    else if (command.mode == FORWARD)
     {
       runForward(outputSpeed);
     }
