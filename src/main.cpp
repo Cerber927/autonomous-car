@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <AS5047P.h>
 #include <BTS7960.h>
+#include <Servo.h>
 
 #define AS5047P_CHIP_SELECT_PORT 10
 #define AS5047P_CUSTOM_SPI_BUS_SPEED 100000
@@ -11,6 +12,10 @@
 #define STOP 0
 #define FORWARD 1
 #define BACKWARD 2
+
+#define STRAIGHT 0
+#define LEFT 1
+#define RIGHT 2
 
 #define DISTANCE_PER_REVOLUTION 0.02353
 
@@ -33,8 +38,10 @@ struct Command // The structure of the command read from the serial monitor
   int mode;
   int speed;
   float distance;
+  int direction;
 };
 Command command;
+Servo myServo;
 
 AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
 BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
@@ -42,9 +49,15 @@ BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
 float pid(int setpoint, float current);
 float handleRollover(float deltaAngle);
 float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
+
 void runForward(int signal);
 void runBackward(int signal);
 void stop();
+
+void turnLeft();
+void goStraight();
+void turnRight();
+
 void passDistance(float currentAngle, float prevAngle);
 void setup_timer();
 void parseCommand(String input);
@@ -56,6 +69,8 @@ int preMode = STOP;
 void setup()
 {
   setup_timer();
+
+  myServo.attach(9);
 
   sei(); // Enable global interrupts
 
@@ -70,6 +85,7 @@ void setup()
   command.mode = STOP;
   command.speed = 0;
   command.distance = 0;
+  command.direction = 0;
 
   motorController.Enable();
 
@@ -123,6 +139,18 @@ void loop()
     if (command.distance > 0)
     {
       passDistance(currentAngle, prevAngle);
+    }
+    if (command.direction == LEFT)
+    {
+      turnLeft();
+    }
+    else if (command.direction == RIGHT)
+    {
+      turnRight();
+    }
+    else
+    {
+      goStraight();
     }
   }
   prevAngle = currentAngle;
@@ -178,6 +206,21 @@ void stop()
   motorController.Stop();
 }
 
+void turnLeft()
+{
+  myServo.write(60);
+}
+
+void goStraight()
+{
+  myServo.write(105);
+}
+
+void turnRight()
+{
+  myServo.write(150);
+}
+
 void passDistance(float currentAngle, float prevAngle)
 {
   // If the angle of the motor surpasses 360 or 0 degree, than distance decreases
@@ -214,6 +257,7 @@ void parseCommand(String input)
   int modeIndex = input.indexOf("mode:");
   int speedIndex = input.indexOf("speed:");
   int distanceIndex = input.indexOf("distance:");
+  int directionIndex = input.indexOf("direction:");
 
   if (modeIndex != -1)
   {
@@ -232,6 +276,12 @@ void parseCommand(String input)
   {
     int endIndex = input.length();
     command.distance = input.substring(distanceIndex + 9, endIndex).toFloat();
+  }
+
+  if (directionIndex != -1)
+  {
+    int endIndex = input.length();
+    command.direction = input.substring(directionIndex + 9, endIndex).toFloat();
   }
 }
 
