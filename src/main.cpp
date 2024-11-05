@@ -281,7 +281,7 @@ void parseCommand(String input)
   if (directionIndex != -1)
   {
     int endIndex = input.length();
-    command.direction = input.substring(directionIndex + 9, endIndex).toFloat();
+    command.direction = input.substring(directionIndex + 9, endIndex).toInt();
   }
 }
 
