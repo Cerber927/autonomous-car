@@ -141,54 +141,23 @@ void loop()
   // by default, no input for distance then distance = 0, it runs infinitely.
   if (command.mode == STOP)
   {
-    while (outputSpeed > 0)
-    {
-      currentTime = micros();
-      if (preSample == 0 || currentTime - preSample >= 1000000/hz)
-      {
-        if (preMode == FORWARD)
-        {
-          outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
-          runForward(outputSpeed);
-          preSample = currentTime;
-        }
-        else if (preMode == BACKWARD)
-        {
-          outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
-          runBackward(outputSpeed);
-          preSample = currentTime;
-        }
-      }
+    if (outputSpeed > 0){
+      stop(currentSpeed);
     }
-    preMode = STOP;
+    else{
+      preMode = STOP;
+    }
   }
   else
   {
     // if the mode changes and current mode is not stop, stop first
-    if (preMode == FORWARD && command.mode == BACKWARD)
+    if (preMode != command.mode)
     {
-      while (outputSpeed > 0)
-      {
-        currentTime = micros();
-        if (preSample == 0 || currentTime - preSample >= 1000000/hz)
-        {
-          outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
-          runForward(outputSpeed);
-          preSample = currentTime;
-        }
+      if (outputSpeed > 0){
+        stop(currentSpeed);
       }
-    }
-    if (preMode == BACKWARD && command.mode == FORWARD)
-    {
-      while (outputSpeed > 0)
-      {
-        currentTime = micros();
-        if (preSample == 0 || currentTime - preSample >= 1000000/hz)
-        {
-          outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
-          runBackward(outputSpeed);
-          preSample = currentTime;
-        }
+      else{
+        preMode = command.mode;
       }
     }
     else if (command.mode == FORWARD)
@@ -218,7 +187,6 @@ void loop()
   }
   prevAngle = currentAngle;
   prevTime = currentTime;
-  preMode = command.mode;
 }
 
 float pid(int setpoint, float current)
@@ -267,24 +235,19 @@ void runBackward(int signal)
 
 void stop(float currentSpeed)
 {
-  while (outputSpeed > 0)
+  unsigned long currentTime = micros();
+  if (preSample == 0 || currentTime - preSample >= 1000000/hz)
   {
-    unsigned long currentTime = micros();
-    if (preSample == 0 || currentTime - preSample >= 1000000/hz)
+    outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
+    if (preMode == FORWARD)
     {
-      if (preMode == FORWARD)
-      {
-        outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
-        runForward(outputSpeed);
-        preSample = currentTime;
-      }
-      else if (preMode == BACKWARD)
-      {
-        outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
-        runBackward(outputSpeed);
-        preSample = currentTime;
-      }
+      runForward(outputSpeed);
     }
+    else if (preMode == BACKWARD)
+    {
+      runBackward(outputSpeed);
+    }
+    preSample = currentTime;
   }
 }
 
@@ -356,7 +319,7 @@ void parseCommand(String input)
     {
       command.mode = STOP;
     }
-    command.speed = constrain(abs(command.speed), 0, 60); // the speed of motor should be in the range of (20, 120)
+    command.speed = constrain(abs(command.speed), 0, 60); // the speed of motor should be in the range of (0, 60)
   }
 
   if (distanceIndex != -1)
