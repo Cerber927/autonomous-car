@@ -17,6 +17,10 @@
 #define LEFT 1
 #define RIGHT 2
 
+#define MAX_RIGHT 150
+#define MAX_LEFT 60
+#define MIDDLE 109
+
 #define DISTANCE_PER_REVOLUTION 0.02353
 
 const uint8_t L_EN = 3;
@@ -87,6 +91,7 @@ void setup()
   command.distance = 0;
   command.direction = 0;
 
+  myServo.write(MIDDLE);
   motorController.Enable();
 
   prevAngle = as5047p.readAngleDegree();
@@ -209,17 +214,17 @@ void stop()
 
 void turnLeft()
 {
-  myServo.write(60);
+  myServo.write(MAX_LEFT);
 }
 
 void goStraight()
 {
-  myServo.write(105);
+  myServo.write(MIDDLE);
 }
 
 void turnRight()
 {
-  myServo.write(150);
+  myServo.write(MAX_RIGHT);
 }
 
 void passDistance(float currentAngle, float prevAngle)
@@ -282,7 +287,7 @@ void parseCommand(String input)
   if (directionIndex != -1)
   {
     int endIndex = input.length();
-    command.direction = input.substring(directionIndex + 9, endIndex).toInt();
+    command.direction = input.substring(directionIndex + 10, endIndex).toInt();
   }
 }
 
