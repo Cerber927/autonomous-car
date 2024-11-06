@@ -26,8 +26,8 @@ const uint8_t R_PWM = 5;
 
 float pidI = 0;
 float prevError = 0;
-const float kp = 0.1;      // Proportional gain
-const float ki = 0.01;     // Integral gain
+const float kp = 0.2;      // Proportional gain
+const float ki = 0.02;     // Integral gain
 const float kd = 0;        // Derivative gain
 const float pidMin = -120; // Minimum PID output
 const float pidMax = 120;  // Maximum PID output
@@ -187,7 +187,8 @@ float handleRollover(float deltaAngle)
 float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime)
 {
   float rpm = abs((deltaAngle / deltaTime / 6) * 1000000);
-  float current = 0.02309 * rpm + 3.577;
+  // float current = 0.02309 * rpm + 3.577;    // the mapping in the air
+  float current = 0.02358 * rpm + 5.685;      // the mapping on the ground
   return current;
 }
 
