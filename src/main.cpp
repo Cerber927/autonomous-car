@@ -2,6 +2,7 @@
 #include <AS5047P.h>
 #include <BTS7960.h>
 #include <Servo.h>
+#include <FastPID.h>
 
 #define AS5047P_CHIP_SELECT_PORT 10
 #define AS5047P_CUSTOM_SPI_BUS_SPEED 100000
@@ -30,12 +31,18 @@ const uint8_t R_PWM = 5;
 
 float pidI = 0;
 float prevError = 0;
-const float kp = 0.2;      // Proportional gain
-const float ki = 0.02;     // Integral gain
-const float kd = 0;        // Derivative gain
-const float pidMin = -120; // Minimum PID output
-const float pidMax = 120;  // Maximum PID output
+const float pidMin = -60; // Minimum PID output
+const float pidMax = 60;  // Maximum PID output
 int outputSpeed = 0;
+
+const float kp = 0.1;      // Proportional gain
+const float ki = 0.5;     // Integral gain
+const float kd = 0;        // Derivative gain
+const float hz = 25;
+const int output_bits = 8;
+const bool output_signed = false;
+
+FastPID myPID(kp, ki, kd, hz, output_bits, output_signed);
 
 struct Command // The structure of the command read from the serial monitor
 {
@@ -78,7 +85,7 @@ void setup()
 
   sei(); // Enable global interrupts
 
-  Serial.begin(115200);
+  Serial.begin(250000);
 
   while (!as5047p.initSPI())
   {
@@ -117,8 +124,16 @@ void loop()
   long deltaTime = currentTime - prevTime;
 
   float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
-  float pidOutput = pid(command.speed, currentSpeed);
-  outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 120);
+  // float pidOutput = pid(command.speed, currentSpeed);
+  // outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 60);
+  Serial.print("currentSpeed: ");
+  Serial.println(currentSpeed);
+
+  
+  outputSpeed = (int)constrain(myPID.step(command.speed, currentSpeed), 0, 60);
+
+  Serial.print("outputSpeed: ");
+  Serial.println(outputSpeed);
 
   // mode has priority, if the mode is STOP, then the car stops no matter what other parameters are
   // by default, no input for distance then distance = 0, it runs infinitely.
