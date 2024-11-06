@@ -19,7 +19,7 @@
 
 #define MAX_RIGHT 150
 #define MAX_LEFT 60
-#define STRAGIGHT 105
+#define MIDDLE 109
 
 #define DISTANCE_PER_REVOLUTION 0.02353
 
@@ -91,6 +91,7 @@ void setup()
   command.distance = 0;
   command.direction = 0;
 
+  myServo.write(MIDDLE);
   motorController.Enable();
 
   prevAngle = as5047p.readAngleDegree();
@@ -191,6 +192,8 @@ float handleRollover(float deltaAngle)
 float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime)
 {
   float rpm = abs((deltaAngle / deltaTime / 6) * 1000000);
+  Serial.print("RPM: ");
+  Serial.println(rpm);
   float current = 0.02309 * rpm + 3.577;
   return current;
 }
@@ -217,7 +220,7 @@ void turnLeft()
 
 void goStraight()
 {
-  myServo.write(STRAIGHT);
+  myServo.write(MIDDLE);
 }
 
 void turnRight()
