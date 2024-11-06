@@ -86,7 +86,7 @@ void setup()
 
   sei(); // Enable global interrupts
 
-  Serial.begin(250000);
+  Serial.begin(115200);
 
   while (!as5047p.initSPI())
   {
@@ -104,7 +104,6 @@ void setup()
 
   prevAngle = as5047p.readAngleDegree();
   prevTime = micros();
-  preSample = micros();
 }
 
 void loop()
@@ -128,10 +127,14 @@ void loop()
   float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
   // float pidOutput = pid(command.speed, currentSpeed);
   // outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 60);
-  Serial.print("currentSpeed: ");
-  Serial.println(currentSpeed);
-
-  if (currentTime - preSample >= 1000000/hz)
+  Serial.print("preSample: ");
+  Serial.println(preSample);
+  Serial.print("currentTime: ");
+  Serial.println(currentTime);
+  Serial.print("command.speed: ");
+  Serial.println(command.speed);
+  
+  if (preSample == 0 || currentTime - preSample >= 1000000/hz)
   {
     outputSpeed = (int)constrain(myPID.step(command.speed, currentSpeed), 0, 60);
     preSample = currentTime;
