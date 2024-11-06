@@ -75,6 +75,7 @@ void parseCommand(String input);
 
 float prevAngle = 0;
 unsigned long prevTime = 0;
+unsigned long preSample = 0;
 int preMode = STOP;
 
 void setup()
@@ -103,6 +104,7 @@ void setup()
 
   prevAngle = as5047p.readAngleDegree();
   prevTime = micros();
+  preSample = micros();
 }
 
 void loop()
@@ -129,8 +131,12 @@ void loop()
   Serial.print("currentSpeed: ");
   Serial.println(currentSpeed);
 
-  outputSpeed = (int)constrain(myPID.step(command.speed, currentSpeed), 0, 60);
-
+  if (currentTime - preSample >= 1000000/hz)
+  {
+    outputSpeed = (int)constrain(myPID.step(command.speed, currentSpeed), 0, 60);
+    preSample = currentTime;
+  }
+  
   Serial.print("outputSpeed: ");
   Serial.println(outputSpeed);
 
