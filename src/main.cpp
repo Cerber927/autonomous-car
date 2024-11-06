@@ -63,7 +63,7 @@ float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
 
 void runForward(int signal);
 void runBackward(int signal);
-void stop();
+void stop(float currentSpeed);
 
 void turnLeft();
 void goStraight();
@@ -127,12 +127,6 @@ void loop()
   float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
   // float pidOutput = pid(command.speed, currentSpeed);
   // outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 60);
-  Serial.print("preSample: ");
-  Serial.println(preSample);
-  Serial.print("currentTime: ");
-  Serial.println(currentTime);
-  Serial.print("command.speed: ");
-  Serial.println(command.speed);
   
   if (preSample == 0 || currentTime - preSample >= 1000000/hz)
   {
@@ -147,14 +141,55 @@ void loop()
   // by default, no input for distance then distance = 0, it runs infinitely.
   if (command.mode == STOP)
   {
-    stop();
+    while (outputSpeed > 0)
+    {
+      currentTime = micros();
+      if (preSample == 0 || currentTime - preSample >= 1000000/hz)
+      {
+        if (preMode == FORWARD)
+        {
+          outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
+          runForward(outputSpeed);
+          preSample = currentTime;
+        }
+        else if (preMode == BACKWARD)
+        {
+          outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
+          runBackward(outputSpeed);
+          preSample = currentTime;
+        }
+      }
+    }
+    preMode = STOP;
   }
   else
   {
     // if the mode changes and current mode is not stop, stop first
-    if (command.mode != preMode)
+    if (preMode == FORWARD && command.mode == BACKWARD)
     {
-      stop();
+      while (outputSpeed > 0)
+      {
+        currentTime = micros();
+        if (preSample == 0 || currentTime - preSample >= 1000000/hz)
+        {
+          outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
+          runForward(outputSpeed);
+          preSample = currentTime;
+        }
+      }
+    }
+    if (preMode == BACKWARD && command.mode == FORWARD)
+    {
+      while (outputSpeed > 0)
+      {
+        currentTime = micros();
+        if (preSample == 0 || currentTime - preSample >= 1000000/hz)
+        {
+          outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
+          runBackward(outputSpeed);
+          preSample = currentTime;
+        }
+      }
     }
     else if (command.mode == FORWARD)
     {
@@ -230,9 +265,27 @@ void runBackward(int signal)
   motorController.TurnLeft(signal);
 }
 
-void stop()
+void stop(float currentSpeed)
 {
-  motorController.Stop();
+  while (outputSpeed > 0)
+  {
+    unsigned long currentTime = micros();
+    if (preSample == 0 || currentTime - preSample >= 1000000/hz)
+    {
+      if (preMode == FORWARD)
+      {
+        outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
+        runForward(outputSpeed);
+        preSample = currentTime;
+      }
+      else if (preMode == BACKWARD)
+      {
+        outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
+        runBackward(outputSpeed);
+        preSample = currentTime;
+      }
+    }
+  }
 }
 
 void turnLeft()
@@ -283,22 +336,27 @@ void setup_timer()
 void parseCommand(String input)
 {
   // Split string based on commas
-  int modeIndex = input.indexOf("mode:");
   int speedIndex = input.indexOf("speed:");
   int distanceIndex = input.indexOf("distance:");
   int directionIndex = input.indexOf("direction:");
-
-  if (modeIndex != -1)
-  {
-    int endIndex = input.indexOf(',', modeIndex);
-    command.mode = input.substring(modeIndex + 5, endIndex).toInt();
-  }
 
   if (speedIndex != -1)
   {
     int endIndex = input.indexOf(',', speedIndex);
     command.speed = input.substring(speedIndex + 6, endIndex).toInt();
-    command.speed = constrain(command.speed, 0, 120); // the speed of motor should be in the range of (20, 120)
+    if (command.speed > 0)
+    {
+      command.mode = FORWARD;
+    }
+    else if (command.speed < 0)
+    {
+      command.mode = BACKWARD;
+    }
+    else
+    {
+      command.mode = STOP;
+    }
+    command.speed = constrain(abs(command.speed), 0, 60); // the speed of motor should be in the range of (20, 120)
   }
 
   if (distanceIndex != -1)
