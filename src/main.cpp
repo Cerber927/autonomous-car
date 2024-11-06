@@ -129,7 +129,6 @@ void loop()
   Serial.print("currentSpeed: ");
   Serial.println(currentSpeed);
 
-  
   outputSpeed = (int)constrain(myPID.step(command.speed, currentSpeed), 0, 60);
 
   Serial.print("outputSpeed: ");
