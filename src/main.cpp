@@ -42,7 +42,7 @@ const float kd = 0;   // Derivative gain
 const float hz = 25;
 
 const int output_bits = 8;
-const bool output_signed = false;
+const bool output_signed = true;
 
 float prevAngle = 0;
 unsigned long prevTime = 0;
@@ -69,7 +69,7 @@ float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
 
 void runForward(int signal);
 void runBackward(int signal);
-void stop(float currentSpeed);
+void stop();
 
 void turnLeft();
 void goStraight();
@@ -128,51 +128,39 @@ void loop()
 
   float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
 
-  if (preSample == 0 || currentTime - preSample >= 1000000 / hz)
+  if (currentTime - preSample >= 1000000 / hz)
   {
     // the output is integer why to cast the output again to integer?
-    outputSpeed = (int)constrain(myPID.step(command.speed, currentSpeed), 0, 60);
+    outputSpeed = constrain(myPID.step(command.speed, currentSpeed), -60, 60);
     preSample = currentTime;
   }
 
-  Serial.print("outputSpeed: ");
-  Serial.println(outputSpeed);
+  // Serial.print("outputSpeed: ");
+  // Serial.println(outputSpeed);
 
   // mode has priority, if the mode is STOP, then the car stops no matter what other parameters are
   // by default, no input for distance then distance = 0, it runs infinitely.
   // refactor the entire if else sequence (better way to do it)
   if (command.mode == STOP)
   {
-    if (outputSpeed > 0)
-    {
-      stop(currentSpeed);
-    }
-    else
-    {
-      preMode = STOP;
-    }
+    stop();
+    preMode = command.mode;
   }
   else
   {
     // if the mode changes and current mode is not stop, stop first
     if (preMode != command.mode)
     {
-      if (outputSpeed > 0)
-      {
-        stop(currentSpeed);
-      }
-      else
-      {
-        preMode = command.mode;
-      }
+      stop();
+      preMode = command.mode;
     }
     else if (command.mode == FORWARD)
     {
-      runForward(outputSpeed);
+      runForward(abs(outputSpeed));
     }
     else if (command.mode == BACKWARD) // move backward
     {
-      runBackward(outputSpeed);
+      runBackward(abs(outputSpeed));
     }
     if (command.distance > 0)
     {
@@ -223,7 +211,7 @@ float handleRollover(float deltaAngle)
 
 float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime)
 {
-  float rpm = abs((deltaAngle / deltaTime / 6) * 1000000);
+  float rpm = (deltaAngle / deltaTime / 6) * 1000000;
   // float current = 0.02309 * rpm + 3.577;    // the mapping in the air
   float current = 0.02358 * rpm + 5.685; // the mapping on the ground
   return current;
@@ -239,23 +227,10 @@ void runBackward(int signal)
   motorController.TurnLeft(signal);
 }
 
-// stop function should stop the car immediately (non intuitive), for smooth transition maybe other function
-void stop(float currentSpeed)
+void stop()
 {
-  unsigned long currentTime = micros();
-  if (preSample == 0 || currentTime - preSample >= 1000000 / hz)
-  {
-    outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
-    if (preMode == FORWARD)
-    {
-      runForward(outputSpeed);
-    }
-    else if (preMode == BACKWARD)
-    {
-      runBackward(outputSpeed);
-    }
-    preSample = currentTime;
-  }
+  motorController.Stop();
+  myPID.clear();
 }
 
 void turnLeft()
@@ -284,6 +259,7 @@ void passDistance(float currentAngle, float prevAngle)
 
   if (command.distance <= 0)
   {
+    command.speed = 0;
     command.mode = STOP;
   }
 }
@@ -327,7 +303,7 @@ void parseCommand(String input)
     {
       command.mode = STOP;
     }
-    command.speed = constrain(abs(command.speed), 0, 60); // the speed of motor should be in the range of (0, 60)
+    command.speed = constrain(command.speed, -60, 60); // the speed of motor should be in the range of (0, 60)
   }
 
   if (distanceIndex != -1)
