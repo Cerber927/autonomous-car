@@ -18,9 +18,9 @@
 #define LEFT 1
 #define RIGHT 2
 
-#define MAX_RIGHT 150
-#define MAX_LEFT 60
-#define MIDDLE 109
+#define MAX_SERVO_POSITION 150
+#define MIN_SERVO_POSITION 60
+#define CENTER_SERVO_POSITION 109
 
 #define DISTANCE_PER_REVOLUTION 0.02353
 
@@ -28,6 +28,7 @@ const uint8_t L_EN = 3;
 const uint8_t R_EN = 4;
 const uint8_t L_PWM = 6;
 const uint8_t R_PWM = 5;
+const uint8_t servo_signal = 9;
 
 float pidI = 0;
 float prevError = 0;
@@ -35,14 +36,23 @@ const float pidMin = -60; // Minimum PID output
 const float pidMax = 60;  // Maximum PID output
 int outputSpeed = 0;
 
-const float kp = 0.1;      // Proportional gain
-const float ki = 0.5;     // Integral gain
-const float kd = 0;        // Derivative gain
+const float kp = 0.1; // Proportional gain
+const float ki = 0.5; // Integral gain (why integral gain higher than proportional gain? not very common)
+const float kd = 0;   // Derivative gain
 const float hz = 25;
+
 const int output_bits = 8;
 const bool output_signed = false;
 
+float prevAngle = 0;
+unsigned long prevTime = 0;
+unsigned long preSample = 0;
+int preMode = STOP;
+
 FastPID myPID(kp, ki, kd, hz, output_bits, output_signed);
+AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
+BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
+Servo steering;
 
 struct Command // The structure of the command read from the serial monitor
 {
@@ -52,10 +62,6 @@ struct Command // The structure of the command read from the serial monitor
   int direction;
 };
 Command command;
-Servo myServo;
-
-AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
-BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
 
 float pid(int setpoint, float current);
 float handleRollover(float deltaAngle);
@@ -70,19 +76,14 @@ void goStraight();
 void turnRight();
 
 void passDistance(float currentAngle, float prevAngle);
-void setup_timer();
+void setupTimer();
 void parseCommand(String input);
-
-float prevAngle = 0;
-unsigned long prevTime = 0;
-unsigned long preSample = 0;
-int preMode = STOP;
 
 void setup()
 {
-  setup_timer();
+  setupTimer();
 
-  myServo.attach(9);
+  steering.attach(servo_signal);
 
   sei(); // Enable global interrupts
 
@@ -99,13 +100,14 @@ void setup()
   command.distance = 0;
   command.direction = 0;
 
-  myServo.write(MIDDLE);
+  steering.write(CENTER_SERVO_POSITION);
   motorController.Enable();
 
   prevAngle = as5047p.readAngleDegree();
   prevTime = micros();
 }
 
+// is the loop frequency same each time, if no then it's problem. maybe use timer interrupts
 void loop()
 {
   if (Serial.available() > 0)
@@ -125,26 +127,28 @@ void loop()
   long deltaTime = currentTime - prevTime;
 
   float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
-  // float pidOutput = pid(command.speed, currentSpeed);
-  // outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 60);
-  
-  if (preSample == 0 || currentTime - preSample >= 1000000/hz)
+
+  if (preSample == 0 || currentTime - preSample >= 1000000 / hz)
   {
+    // the output is integer why to cast the output again to integer?
     outputSpeed = (int)constrain(myPID.step(command.speed, currentSpeed), 0, 60);
     preSample = currentTime;
   }
-  
+
   Serial.print("outputSpeed: ");
   Serial.println(outputSpeed);
 
   // mode has priority, if the mode is STOP, then the car stops no matter what other parameters are
   // by default, no input for distance then distance = 0, it runs infinitely.
+  // refactor the entire if else sequence (better way to do it)
   if (command.mode == STOP)
   {
-    if (outputSpeed > 0){
+    if (outputSpeed > 0)
+    {
       stop(currentSpeed);
     }
-    else{
+    else
+    {
       preMode = STOP;
     }
   }
@@ -153,10 +157,12 @@ void loop()
     // if the mode changes and current mode is not stop, stop first
     if (preMode != command.mode)
     {
-      if (outputSpeed > 0){
+      if (outputSpeed > 0)
+      {
         stop(currentSpeed);
       }
-      else{
+      else
+      {
         preMode = command.mode;
       }
     }
@@ -219,7 +225,7 @@ float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime)
 {
   float rpm = abs((deltaAngle / deltaTime / 6) * 1000000);
   // float current = 0.02309 * rpm + 3.577;    // the mapping in the air
-  float current = 0.02358 * rpm + 5.685;      // the mapping on the ground
+  float current = 0.02358 * rpm + 5.685; // the mapping on the ground
   return current;
 }
 
@@ -233,10 +239,11 @@ void runBackward(int signal)
   motorController.TurnLeft(signal);
 }
 
+// stop function should stop the car immediately (non intuitive), for smooth transition maybe other function
 void stop(float currentSpeed)
 {
   unsigned long currentTime = micros();
-  if (preSample == 0 || currentTime - preSample >= 1000000/hz)
+  if (preSample == 0 || currentTime - preSample >= 1000000 / hz)
   {
     outputSpeed = (int)constrain(myPID.step(0, currentSpeed), 0, 60);
     if (preMode == FORWARD)
@@ -253,22 +260,23 @@ void stop(float currentSpeed)
 
 void turnLeft()
 {
-  myServo.write(MAX_LEFT);
+  steering.write(MIN_SERVO_POSITION);
 }
 
 void goStraight()
 {
-  myServo.write(MIDDLE);
+  steering.write(CENTER_SERVO_POSITION);
 }
 
 void turnRight()
 {
-  myServo.write(MAX_RIGHT);
+  steering.write(MAX_SERVO_POSITION);
 }
 
+// why to use 2 arguments, isn't it possible to implement it with delta angle only
 void passDistance(float currentAngle, float prevAngle)
 {
-  // If the angle of the motor surpasses 360 or 0 degree, than distance decreases
+  // If the angle of the motor surpasses 360 or 0 degree, then distance decreases
   if ((prevAngle > 300 && currentAngle < 60) || (prevAngle < 60 && currentAngle > 300))
   {
     command.distance -= DISTANCE_PER_REVOLUTION; // For one rotation of the motor, the car moves 0.02353m
@@ -280,7 +288,7 @@ void passDistance(float currentAngle, float prevAngle)
   }
 }
 
-void setup_timer()
+void setupTimer()
 {
   TCCR1A = 0; // Set entire TCCR1A register to 0
   TCCR1B = 0; // Same for TCCR1B
