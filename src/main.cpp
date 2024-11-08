@@ -285,7 +285,6 @@ void passDistance(float currentAngle, float prevAngle)
   if (command.distance <= 0)
   {
     command.mode = STOP;
-    
   }
 }
 
