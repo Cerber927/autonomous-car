@@ -155,19 +155,6 @@ void loop()
   prevTime = currentTime;
 }
 
-// DEPRECATED: will be removed in the future
-float pid(int setpoint, float current)
-{
-  float error = (float)setpoint - current;
-  pidI += ki * error;
-  pidI = constrain(pidI, -1, 1);
-  float deltaError = error - prevError;
-  float pidOutput = kp * error + pidI + kd * deltaError;
-  pidOutput = constrain(pidOutput, pidMin, pidMax);
-  prevError = error;
-  return pidOutput;
-}
-
 float handleRollover(float deltaAngle)
 {
   if (deltaAngle < -DEGREES_PER_REVOLUTION / 2)
