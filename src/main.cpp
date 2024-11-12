@@ -63,7 +63,6 @@ struct Command // The structure of the command read from the serial monitor
 };
 Command command;
 
-float pid(int setpoint, float current);
 float handleRollover(float deltaAngle);
 float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
 
