@@ -9,6 +9,7 @@
 #define DEGREES_PER_REVOLUTION 360
 #define PRESCALER 64
 #define SAMPLING_FREQUENCY 250
+#define PID_SAMPLING_FREQUENCY 25
 
 #define STOP 0
 #define FORWARD 1
@@ -39,17 +40,16 @@ int outputSpeed = 0;
 const float kp = 0.1; // Proportional gain
 const float ki = 0.5; // Integral gain (why integral gain higher than proportional gain? not very common)
 const float kd = 0;   // Derivative gain
-const float hz = 25;
 
 const int output_bits = 8;
 const bool output_signed = true;
 
 float prevAngle = 0;
 unsigned long prevTime = 0;
-unsigned long preSample = 0;
-int preMode = STOP;
+unsigned long pidSamplingTime = 0;
+int prevMode = STOP;
 
-FastPID myPID(kp, ki, kd, hz, output_bits, output_signed);
+FastPID pid_motor(kp, ki, kd, PID_SAMPLING_FREQUENCY, output_bits, output_signed);
 AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
 BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
 Servo steering;
@@ -67,13 +67,9 @@ float pid(int setpoint, float current);
 float handleRollover(float deltaAngle);
 float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
 
-void runForward(int signal);
-void runBackward(int signal);
+void runMotor(int mode, int signal);
 void stop();
-
-void turnLeft();
-void goStraight();
-void turnRight();
+void steer(int direction);
 
 void passDistance(float currentAngle, float prevAngle);
 void setupTimer();
@@ -115,7 +111,6 @@ void loop()
     String input = Serial.readStringUntil('\n');
     if (input) // Prevent unintended reset to 0
     {
-      Serial.println(input);
       parseCommand(input);
     }
   }
@@ -128,66 +123,44 @@ void loop()
 
   float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
 
-  if (currentTime - preSample >= 1000000 / hz)
+  if (currentTime - pidSamplingTime >= 1000000 / PID_SAMPLING_FREQUENCY)
   {
     // the output is integer why to cast the output again to integer?
-    outputSpeed = constrain(myPID.step(command.speed, currentSpeed), -60, 60);
-    preSample = currentTime;
+    outputSpeed = abs(constrain(pid_motor.step(command.speed, currentSpeed), -60, 60));
+    pidSamplingTime = currentTime;
   }
 
-  // Serial.print("outputSpeed: ");
-  // Serial.println(outputSpeed);
-
-  // mode has priority, if the mode is STOP, then the car stops no matter what other parameters are
-  // by default, no input for distance then distance = 0, it runs infinitely.
-  // refactor the entire if else sequence (better way to do it)
   if (command.mode == STOP)
   {
     stop();
-    preMode = command.mode;
   }
   else
   {
     // if the mode changes and current mode is not stop, stop first
-    if (preMode != command.mode)
+    if (prevMode != command.mode)
     {
       stop();
-      preMode = command.mode;
     }
-    else if (command.mode == FORWARD)
-    {
-      runForward(abs(outputSpeed));
-    }
-    else if (command.mode == BACKWARD) // move backward
-    {
-      runBackward(abs(outputSpeed));
-    }
+
+    runMotor(command.mode, outputSpeed);
+
     if (command.distance > 0)
     {
       passDistance(currentAngle, prevAngle);
     }
-    if (command.direction == LEFT)
-    {
-      turnLeft();
-    }
-    else if (command.direction == RIGHT)
-    {
-      turnRight();
-    }
-    else
-    {
-      goStraight();
-    }
+
+    steer(command.direction);
   }
   prevAngle = currentAngle;
   prevTime = currentTime;
 }
 
+// DEPRECATED: will be removed in the future
 float pid(int setpoint, float current)
 {
   float error = (float)setpoint - current;
   pidI += ki * error;
-  pidI = constrain(pidI, -1, 1); // the limiting between -1 and 1 basically means that integral part has no effect on the output
+  pidI = constrain(pidI, -1, 1);
   float deltaError = error - prevError;
   float pidOutput = kp * error + pidI + kd * deltaError;
   pidOutput = constrain(pidOutput, pidMin, pidMax);
@@ -217,35 +190,39 @@ float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime)
   return current;
 }
 
-void runForward(int signal)
-{
-  motorController.TurnRight(signal);
-}
-
-void runBackward(int signal)
-{
-  motorController.TurnLeft(signal);
-}
-
 void stop()
 {
   motorController.Stop();
-  myPID.clear();
+  pid_motor.clear();
+  prevMode = command.mode;
 }
 
-void turnLeft()
+void runMotor(int mode, int signal)
 {
-  steering.write(MIN_SERVO_POSITION);
+  if (mode == FORWARD)
+  {
+    motorController.TurnRight(signal);
+  }
+  else if (mode == BACKWARD)
+  {
+    motorController.TurnLeft(signal);
+  }
 }
 
-void goStraight()
+void steer(int direction)
 {
-  steering.write(CENTER_SERVO_POSITION);
-}
-
-void turnRight()
-{
-  steering.write(MAX_SERVO_POSITION);
+  if (direction == LEFT)
+  {
+    steering.write(MIN_SERVO_POSITION);
+  }
+  else if (direction == RIGHT)
+  {
+    steering.write(MAX_SERVO_POSITION);
+  }
+  else
+  {
+    steering.write(CENTER_SERVO_POSITION);
+  }
 }
 
 // why to use 2 arguments, isn't it possible to implement it with delta angle only
@@ -303,7 +280,7 @@ void parseCommand(String input)
     {
       command.mode = STOP;
     }
-    command.speed = constrain(command.speed, -60, 60); // the speed of motor should be in the range of (0, 60)
+    command.speed = constrain(command.speed, -60, 60); // the speed of motor should be in the range of (-60, 60)
   }
 
   if (distanceIndex != -1)
