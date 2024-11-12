@@ -50,8 +50,8 @@ unsigned long pidSamplingTime = 0;
 int prevMode = STOP;
 
 FastPID pid_motor(kp, ki, kd, PID_SAMPLING_FREQUENCY, output_bits, output_signed);
-AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
-BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
+AS5047P encoder(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
+BTS7960 motorDriver(L_EN, R_EN, L_PWM, R_PWM);
 Servo steering;
 
 struct Command // The structure of the command read from the serial monitor
@@ -84,7 +84,7 @@ void setup()
 
   Serial.begin(115200);
 
-  while (!as5047p.initSPI())
+  while (!encoder.initSPI())
   {
     Serial.println(F("Can't connect to the AS5047P sensor! Please check the connection..."));
     delay(5000);
@@ -96,9 +96,9 @@ void setup()
   command.direction = 0;
 
   steering.write(CENTER_SERVO_POSITION);
-  motorController.Enable();
+  motorDriver.Enable();
 
-  prevAngle = as5047p.readAngleDegree();
+  prevAngle = encoder.readAngleDegree();
   prevTime = micros();
 }
 
@@ -114,7 +114,7 @@ void loop()
     }
   }
 
-  float currentAngle = as5047p.readAngleDegree();
+  float currentAngle = encoder.readAngleDegree();
   unsigned long currentTime = micros();
 
   float deltaAngle = handleRollover(currentAngle - prevAngle);
@@ -179,7 +179,7 @@ float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime)
 
 void stop()
 {
-  motorController.Stop();
+  motorDriver.Stop();
   pid_motor.clear();
   prevMode = command.mode;
 }
@@ -188,11 +188,11 @@ void runMotor(int mode, int signal)
 {
   if (mode == FORWARD)
   {
-    motorController.TurnRight(signal);
+    motorDriver.TurnRight(signal);
   }
   else if (mode == BACKWARD)
   {
-    motorController.TurnLeft(signal);
+    motorDriver.TurnLeft(signal);
   }
 }
 
