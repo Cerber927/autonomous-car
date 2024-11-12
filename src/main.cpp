@@ -213,7 +213,8 @@ float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime)
 {
   float rpm = (deltaAngle / deltaTime / 6) * 1000000;
   // float current = 0.02309 * rpm + 3.577;    // the mapping in the air
-  float current = 0.02358 * rpm + 5.685; // the mapping on the ground
+  // float current = 0.02358 * rpm + 5.685; // the mapping on the ground
+  float current = 0.025 * rpm; // test
   return current;
 }
 
