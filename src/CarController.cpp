@@ -24,12 +24,13 @@
 class CarController {
 
 public:
-    CarController(uint8_t lEn = 3, uint8_t rEn = 4, uint8_t lPwm = 6, uint8_t rPwm = 5, uint8_t servoPin = 9, float kp = 0.1, float ki = 0.5, float kd = 0)
+    CarController(uint8_t lEn = 3, uint8_t rEn = 4, uint8_t lPwm = 6, uint8_t rPwm = 5, uint8_t servoPin = 9, unsigned long baudRate = 115200, float kp = 0.1, float ki = 0.5, float kd = 0)
         : motorDriver(lEn, rEn, lPwm, rPwm), servoPin(servoPin), steeringServo(),
           pid(kp, ki, kd, PID_SAMPLING_FREQUENCY, 8, true), 
-          prevTime(0), prevAngle(0), prevMode(STOP), currentSpeed(0), targetSpeed(0), lastSampleTime(0) {}
+          baudRate(baudRate), prevTime(0), prevAngle(0), prevMode(STOP), currentSpeed(0), targetSpeed(0), lastSampleTime(0) {}
 
     void setup() {
+        Serial.begin(baudRate);
         steeringServo.attach(servoPin);
         encoder.initSPI();
         motorDriver.Enable();
@@ -55,6 +56,7 @@ private:
     FastPID pid;
     AS5047P encoder;  // Encoder object handles angle reading
 
+    unsigned long baudRate;
     unsigned long prevTime;
     float prevAngle;
     int prevMode;
