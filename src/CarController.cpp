@@ -119,13 +119,13 @@ private:
             unsigned long currentTime = micros();
 
             float deltaAngle = handleRollover(currentAngle - prevAngle);
-            long deltaTime = currentTime - prevTime;
+            unsigned long deltaTime = currentTime - prevTime;
             prevAngle = currentAngle;  // Update for the next calculation
             
             float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
             
             if (distance > 0){
-                passDistance(distance);
+                passDistance(distance, deltaAngle);
             }
 
             if ((currentTime - lastSampleTime) >= (1000000 / PID_SAMPLING_FREQUENCY)) {  // Check if it's time to sample
@@ -168,13 +168,9 @@ private:
         steeringServo.write(position);
     }
 
-    void passDistance(float targetDistance) {
+    void passDistance(float targetDistance, float deltaAngle) {
         if (targetDistance > 0) {
-            float currentAngle = encoder.readAngleDegree();
-            float deltaAngle = handleRollover(currentAngle - prevAngle);
             targetDistance -= deltaAngle / DEGREES_PER_REVOLUTION * DISTANCE_PER_REVOLUTION;
-            prevAngle = currentAngle;
-            delay(10);
         }
         else {
             stop();
