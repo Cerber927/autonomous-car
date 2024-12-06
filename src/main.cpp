@@ -16,12 +16,18 @@
 #define BACKWARD 2
 
 #define STRAIGHT 0
-#define LEFT 1
-#define RIGHT 2
+#define LEFT_1 -2
+#define LEFT_2 -1
+#define RIGHT_1 1
+#define RIGHT_2 2
 
 #define MAX_SERVO_POSITION 150
 #define MIN_SERVO_POSITION 60
+#define CENTER_LEFT_1 68
+#define CENTER_LEFT_2 88
 #define CENTER_SERVO_POSITION 108
+#define CENTER_RIGHT_1 128
+#define CENTER_RIGHT_2 148
 
 #define DISTANCE_PER_REVOLUTION 0.02353
 
@@ -198,13 +204,21 @@ void runMotor(int mode, int signal)
 
 void steer(int direction)
 {
-  if (direction == LEFT)
+  if (direction == LEFT_1)
   {
-    steering.write(MIN_SERVO_POSITION);
+    steering.write(CENTER_LEFT_1);
   }
-  else if (direction == RIGHT)
+  else if (direction == LEFT_2)
   {
-    steering.write(MAX_SERVO_POSITION);
+    steering.write(CENTER_LEFT_2);
+  }
+  else if (direction == RIGHT_1)
+  {
+    steering.write(CENTER_RIGHT_1);
+  }
+  else if (direction == RIGHT_2)
+  {
+    steering.write(CENTER_RIGHT_2);
   }
   else
   {
