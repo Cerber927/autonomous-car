@@ -198,31 +198,16 @@ void runMotor(int mode, int signal)
 
 void steer(float direction)
 {
-  float steeringSignal = CENTER_SERVO_POSITION;
-  if (direction <= LEFT)
+  float steeringSignal;
+  if (direction < 0)
   {
-    steering.write(MIN_SERVO_POSITION);
-  }
-  else if (direction >= RIGHT)
-  {
-    steering.write(MAX_SERVO_POSITION);
-  }
-  else if (direction == STRAIGHT)
-  {
-    steering.write(CENTER_SERVO_POSITION);
+    steeringSignal = CENTER_SERVO_POSITION + (CENTER_SERVO_POSITION - MIN_SERVO_POSITION) * direction;
   }
   else
   {
-    if (direction < 0)
-    {
-      steeringSignal = CENTER_SERVO_POSITION + (CENTER_SERVO_POSITION - MIN_SERVO_POSITION) * direction;
-    }
-    else
-    {
-      steeringSignal = CENTER_SERVO_POSITION + (MAX_SERVO_POSITION - CENTER_SERVO_POSITION) * direction;
-    }
-    steering.write(steeringSignal);
+    steeringSignal = CENTER_SERVO_POSITION + (MAX_SERVO_POSITION - CENTER_SERVO_POSITION) * direction;
   }
+  steering.write(steeringSignal);
 }
 
 // why to use 2 arguments, isn't it possible to implement it with delta angle only
