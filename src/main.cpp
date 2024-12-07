@@ -10,6 +10,7 @@
 #define PRESCALER 64
 #define SAMPLING_FREQUENCY 250
 #define PID_SAMPLING_FREQUENCY 25
+#define SERIAL_SENDING_PERIOD 200000
 
 #define STOP 0
 #define FORWARD 1
@@ -47,6 +48,7 @@ const bool output_signed = true;
 float prevAngle = 0;
 unsigned long prevTime = 0;
 unsigned long pidSamplingTime = 0;
+unsigned long serialSendingTime = 0;
 int prevMode = STOP;
 
 FastPID pid_motor(kp, ki, kd, PID_SAMPLING_FREQUENCY, output_bits, output_signed);
@@ -121,6 +123,12 @@ void loop()
   long deltaTime = currentTime - prevTime;
 
   float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
+
+  if (currentTime - serialSendingTime >= SERIAL_SENDING_PERIOD)
+  {
+    // the output is integer why to cast the output again to integer?
+    Serial.println(currentSpeed);
+  }
 
   if (currentTime - pidSamplingTime >= 1000000 / PID_SAMPLING_FREQUENCY)
   {
