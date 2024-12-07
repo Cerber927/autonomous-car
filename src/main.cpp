@@ -16,18 +16,12 @@
 #define BACKWARD 2
 
 #define STRAIGHT 0
-#define LEFT_1 -2
-#define LEFT_2 -1
-#define RIGHT_1 1
-#define RIGHT_2 2
+#define LEFT -1
+#define RIGHT 1
 
 #define MAX_SERVO_POSITION 150
 #define MIN_SERVO_POSITION 60
-#define CENTER_LEFT_1 68
-#define CENTER_LEFT_2 88
 #define CENTER_SERVO_POSITION 108
-#define CENTER_RIGHT_1 128
-#define CENTER_RIGHT_2 148
 
 #define DISTANCE_PER_REVOLUTION 0.02353
 
@@ -65,7 +59,7 @@ struct Command // The structure of the command read from the serial monitor
   int mode;
   int speed;
   float distance;
-  int direction;
+  float direction;
 };
 Command command;
 
@@ -74,7 +68,7 @@ float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
 
 void runMotor(int mode, int signal);
 void stop();
-void steer(int direction);
+void steer(float direction);
 
 void passDistance(float currentAngle, float prevAngle);
 void setupTimer();
@@ -202,27 +196,32 @@ void runMotor(int mode, int signal)
   }
 }
 
-void steer(int direction)
+void steer(float direction)
 {
-  if (direction == LEFT_1)
+  float steeringSignal = CENTER_SERVO_POSITION;
+  if (direction <= LEFT)
   {
-    steering.write(CENTER_LEFT_1);
+    steering.write(MIN_SERVO_POSITION);
   }
-  else if (direction == LEFT_2)
+  else if (direction >= RIGHT)
   {
-    steering.write(CENTER_LEFT_2);
+    steering.write(MAX_SERVO_POSITION);
   }
-  else if (direction == RIGHT_1)
+  else if (direction == STRAIGHT)
   {
-    steering.write(CENTER_RIGHT_1);
-  }
-  else if (direction == RIGHT_2)
-  {
-    steering.write(CENTER_RIGHT_2);
+    steering.write(CENTER_SERVO_POSITION);
   }
   else
   {
-    steering.write(CENTER_SERVO_POSITION);
+    if (direction < 0)
+    {
+      steeringSignal = CENTER_SERVO_POSITION + (CENTER_SERVO_POSITION - MIN_SERVO_POSITION) * direction;
+    }
+    else
+    {
+      steeringSignal = CENTER_SERVO_POSITION + (MAX_SERVO_POSITION - CENTER_SERVO_POSITION) * direction;
+    }
+    steering.write(steeringSignal);
   }
 }
 
@@ -293,7 +292,7 @@ void parseCommand(String input)
   if (directionIndex != -1)
   {
     int endIndex = input.length();
-    command.direction = input.substring(directionIndex + 10, endIndex).toInt();
+    command.direction = constrain(input.substring(directionIndex + 10, endIndex).toFloat(), LEFT, RIGHT);
   }
 }
 
