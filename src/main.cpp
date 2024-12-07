@@ -207,7 +207,7 @@ void steer(float direction)
   {
     steeringSignal = CENTER_SERVO_POSITION + (MAX_SERVO_POSITION - CENTER_SERVO_POSITION) * direction;
   }
-  steering.write(steeringSignal);
+  steering.write((int)steeringSignal);
 }
 
 // why to use 2 arguments, isn't it possible to implement it with delta angle only
