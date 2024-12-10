@@ -10,15 +10,14 @@
 #define PRESCALER 64
 #define SAMPLING_FREQUENCY 250
 #define PID_SAMPLING_FREQUENCY 25
-#define SERIAL_SENDING_PERIOD 200000
 
 #define STOP 0
 #define FORWARD 1
 #define BACKWARD 2
 
 #define STRAIGHT 0
-#define LEFT -1
-#define RIGHT 1
+#define LEFT 1
+#define RIGHT 2
 
 #define MAX_SERVO_POSITION 150
 #define MIN_SERVO_POSITION 60
@@ -48,12 +47,11 @@ const bool output_signed = true;
 float prevAngle = 0;
 unsigned long prevTime = 0;
 unsigned long pidSamplingTime = 0;
-unsigned long serialSendingTime = 0;
 int prevMode = STOP;
 
 FastPID pid_motor(kp, ki, kd, PID_SAMPLING_FREQUENCY, output_bits, output_signed);
-AS5047P encoder(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
-BTS7960 motorDriver(L_EN, R_EN, L_PWM, R_PWM);
+AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
+BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
 Servo steering;
 
 struct Command // The structure of the command read from the serial monitor
@@ -65,6 +63,7 @@ struct Command // The structure of the command read from the serial monitor
 };
 Command command;
 
+float pid(int setpoint, float current);
 float handleRollover(float deltaAngle);
 float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
 
@@ -86,7 +85,7 @@ void setup()
 
   Serial.begin(115200);
 
-  while (!encoder.initSPI())
+  while (!as5047p.initSPI())
   {
     Serial.println(F("Can't connect to the AS5047P sensor! Please check the connection..."));
     delay(5000);
@@ -98,9 +97,9 @@ void setup()
   command.direction = 0;
 
   steering.write(CENTER_SERVO_POSITION);
-  motorDriver.Enable();
+  motorController.Enable();
 
-  prevAngle = encoder.readAngleDegree();
+  prevAngle = as5047p.readAngleDegree();
   prevTime = micros();
 }
 
@@ -116,19 +115,13 @@ void loop()
     }
   }
 
-  float currentAngle = encoder.readAngleDegree();
+  float currentAngle = as5047p.readAngleDegree();
   unsigned long currentTime = micros();
 
   float deltaAngle = handleRollover(currentAngle - prevAngle);
   long deltaTime = currentTime - prevTime;
 
   float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
-
-  if (currentTime - serialSendingTime >= SERIAL_SENDING_PERIOD)
-  {
-    // the output is integer why to cast the output again to integer?
-    Serial.println(currentSpeed);
-  }
 
   if (currentTime - pidSamplingTime >= 1000000 / PID_SAMPLING_FREQUENCY)
   {
@@ -162,6 +155,19 @@ void loop()
   prevTime = currentTime;
 }
 
+// DEPRECATED: will be removed in the future
+float pid(int setpoint, float current)
+{
+  float error = (float)setpoint - current;
+  pidI += ki * error;
+  pidI = constrain(pidI, -1, 1);
+  float deltaError = error - prevError;
+  float pidOutput = kp * error + pidI + kd * deltaError;
+  pidOutput = constrain(pidOutput, pidMin, pidMax);
+  prevError = error;
+  return pidOutput;
+}
+
 float handleRollover(float deltaAngle)
 {
   if (deltaAngle < -DEGREES_PER_REVOLUTION / 2)
@@ -187,7 +193,7 @@ float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime)
 
 void stop()
 {
-  motorDriver.Stop();
+  motorController.Stop();
   pid_motor.clear();
   prevMode = command.mode;
 }
@@ -196,26 +202,26 @@ void runMotor(int mode, int signal)
 {
   if (mode == FORWARD)
   {
-    motorDriver.TurnRight(signal);
+    motorController.TurnRight(signal);
   }
   else if (mode == BACKWARD)
   {
-    motorDriver.TurnLeft(signal);
+    motorController.TurnLeft(signal);
   }
 }
 
 void steer(float direction)
 {
-  float steeringSignal;
+  float steerSignal;
   if (direction < 0)
   {
-    steeringSignal = CENTER_SERVO_POSITION + (CENTER_SERVO_POSITION - MIN_SERVO_POSITION) * direction;
+    steerSignal = CENTER_SERVO_POSITION + (CENTER_SERVO_POSITION - MIN_SERVO_POSITION) * direction;
   }
   else
   {
-    steeringSignal = CENTER_SERVO_POSITION + (MAX_SERVO_POSITION - CENTER_SERVO_POSITION) * direction;
+    steerSignal = CENTER_SERVO_POSITION + (MAX_SERVO_POSITION - CENTER_SERVO_POSITION) * direction;
   }
-  steering.write((int)steeringSignal);
+  steering.write((int)steerSignal);
 }
 
 // why to use 2 arguments, isn't it possible to implement it with delta angle only
@@ -285,7 +291,7 @@ void parseCommand(String input)
   if (directionIndex != -1)
   {
     int endIndex = input.length();
-    command.direction = constrain(input.substring(directionIndex + 10, endIndex).toFloat(), LEFT, RIGHT);
+    command.direction = constrain(input.substring(directionIndex + 10, endIndex).toFloat(), -1, 1);
   }
 }
 
