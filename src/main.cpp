@@ -21,7 +21,7 @@
 
 #define MAX_SERVO_POSITION 150
 #define MIN_SERVO_POSITION 60
-#define CENTER_SERVO_POSITION 109
+#define CENTER_SERVO_POSITION 108
 
 #define DISTANCE_PER_REVOLUTION 0.02353
 
@@ -59,7 +59,7 @@ struct Command // The structure of the command read from the serial monitor
   int mode;
   int speed;
   float distance;
-  int direction;
+  float direction;
 };
 Command command;
 
@@ -69,7 +69,7 @@ float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
 
 void runMotor(int mode, int signal);
 void stop();
-void steer(int direction);
+void steer(float direction);
 
 void passDistance(float currentAngle, float prevAngle);
 void setupTimer();
@@ -210,20 +210,18 @@ void runMotor(int mode, int signal)
   }
 }
 
-void steer(int direction)
+void steer(float direction)
 {
-  if (direction == LEFT)
+  float steerSignal;
+  if (direction < 0)
   {
-    steering.write(MIN_SERVO_POSITION);
-  }
-  else if (direction == RIGHT)
-  {
-    steering.write(MAX_SERVO_POSITION);
+    steerSignal = CENTER_SERVO_POSITION + (CENTER_SERVO_POSITION - MIN_SERVO_POSITION) * direction;
   }
   else
   {
-    steering.write(CENTER_SERVO_POSITION);
+    steerSignal = CENTER_SERVO_POSITION + (MAX_SERVO_POSITION - CENTER_SERVO_POSITION) * direction;
   }
+  steering.write((int)steerSignal);
 }
 
 // why to use 2 arguments, isn't it possible to implement it with delta angle only
@@ -293,7 +291,7 @@ void parseCommand(String input)
   if (directionIndex != -1)
   {
     int endIndex = input.length();
-    command.direction = input.substring(directionIndex + 10, endIndex).toInt();
+    command.direction = constrain(input.substring(directionIndex + 10, endIndex).toFloat(), -1, 1);
   }
 }
 
