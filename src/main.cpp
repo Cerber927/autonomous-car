@@ -262,12 +262,11 @@ void parseCommand(String input)
   int speedIndex = input.indexOf("speed:");
   int distanceIndex = input.indexOf("distance:");
   int directionIndex = input.indexOf("direction:");
-  float speed = 0;  // the speed of the car: 0.3m/s to 1m/s 
 
   if (speedIndex != -1)
   {
     int endIndex = input.indexOf(',', speedIndex);
-    speed = input.substring(speedIndex + 6, endIndex).toFloat();
+    float speed = input.substring(speedIndex + 6, endIndex).toFloat();
     // command.speed = input.substring(speedIndex + 6, endIndex).toInt();
     if (speed > 0)
     {
