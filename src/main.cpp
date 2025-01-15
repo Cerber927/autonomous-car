@@ -266,13 +266,13 @@ void parseCommand(String input)
   if (speedIndex != -1)
   {
     int endIndex = input.indexOf(',', speedIndex);
-    float speed = input.substring(speedIndex + 6, endIndex).toFloat();
+    command.speed = (int)(input.substring(speedIndex + 6, endIndex).toFloat() * 63.7484);
     // command.speed = input.substring(speedIndex + 6, endIndex).toInt();
-    if (speed > 0)
+    if (command.speed > 0)
     {
       command.mode = FORWARD;
     }
-    else if (speed < 0)
+    else if (command.speed < 0)
     {
       command.mode = BACKWARD;
     }
@@ -280,8 +280,7 @@ void parseCommand(String input)
     {
       command.mode = STOP;
     }
-    command.speed = (int)(speed * 63.7484);
-    command.speed = constrain(command.speed, -64, 64); // the speed of motor should be in the range of (-60, 60)
+    command.speed = constrain(command.speed, -64, 64); // the speed of motor should be in the range of (-64, 64)
   }
 
   if (distanceIndex != -1)
