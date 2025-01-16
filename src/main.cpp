@@ -49,6 +49,8 @@ unsigned long prevTime = 0;
 unsigned long pidSamplingTime = 0;
 int prevMode = STOP;
 
+float imuAngle = 0;
+
 FastPID pid_motor(kp, ki, kd, PID_SAMPLING_FREQUENCY, output_bits, output_signed);
 AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
 BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
@@ -60,6 +62,7 @@ struct Command // The structure of the command read from the serial monitor
   int speed;
   float distance;
   float direction;
+  float angle;
 };
 Command command;
 
@@ -95,6 +98,7 @@ void setup()
   command.speed = 0;
   command.distance = 0;
   command.direction = 0;
+  command.angle = 0;
 
   steering.write(CENTER_SERVO_POSITION);
   motorController.Enable();
@@ -149,7 +153,22 @@ void loop()
       passDistance(currentAngle, prevAngle);
     }
 
-    steer(command.direction);
+    if (command.direction != 0)
+    {
+      steer(command.direction);
+    }
+    else
+    {
+      if (imuAngle - command.angle >= 1 || imuAngle - command.angle >= -359)
+      {
+        steer(-0.02);
+      }
+      else if (command.angle - imuAngle >= 1 || command.angle - imuAngle >= -359)
+      {
+        steer(0.02);
+      }
+    }
+
   }
   prevAngle = currentAngle;
   prevTime = currentTime;
@@ -262,6 +281,8 @@ void parseCommand(String input)
   int speedIndex = input.indexOf("speed:");
   int distanceIndex = input.indexOf("distance:");
   int directionIndex = input.indexOf("direction:");
+  int angleIndex = input.indexOf("angle:");
+  int imuAngleIndex = input.indexOf("imuAngle:");
 
   if (speedIndex != -1)
   {
@@ -293,6 +314,18 @@ void parseCommand(String input)
   {
     int endIndex = input.length();
     command.direction = constrain(input.substring(directionIndex + 10, endIndex).toFloat(), -1, 1);
+  }
+
+  if (angleIndex != -1)
+  {
+    int endIndex = input.length();
+    command.angle = input.substring(angleIndex + 6, endIndex).toFloat();
+  }
+
+  if (imuAngleIndex != -1)
+  {
+    int endIndex = input.length();
+    imuAngle = input.substring(imuAngleIndex + 9, endIndex).toFloat();
   }
 }
 
