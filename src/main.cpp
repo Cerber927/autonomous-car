@@ -49,8 +49,6 @@ unsigned long prevTime = 0;
 unsigned long pidSamplingTime = 0;
 int prevMode = STOP;
 
-float imuAngle = 0;
-
 FastPID pid_motor(kp, ki, kd, PID_SAMPLING_FREQUENCY, output_bits, output_signed);
 AS5047P as5047p(AS5047P_CHIP_SELECT_PORT, AS5047P_CUSTOM_SPI_BUS_SPEED);
 BTS7960 motorController(L_EN, R_EN, L_PWM, R_PWM);
@@ -62,11 +60,9 @@ struct Command // The structure of the command read from the serial monitor
   int speed;
   float distance;
   float direction;
-  float angle;
 };
 Command command;
 
-float pid(int setpoint, float current);
 float handleRollover(float deltaAngle);
 float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime);
 
@@ -98,7 +94,6 @@ void setup()
   command.speed = 0;
   command.distance = 0;
   command.direction = 0;
-  command.angle = 0;
 
   steering.write(CENTER_SERVO_POSITION);
   motorController.Enable();
@@ -153,38 +148,11 @@ void loop()
       passDistance(currentAngle, prevAngle);
     }
 
-    if (command.direction != 0)
-    {
-      steer(command.direction);
-    }
-    else
-    {
-      if (imuAngle - command.angle >= 1 || imuAngle - command.angle >= -359)
-      {
-        steer(-0.02);
-      }
-      else if (command.angle - imuAngle >= 1 || command.angle - imuAngle >= -359)
-      {
-        steer(0.02);
-      }
-    }
+    steer(command.direction);
 
   }
   prevAngle = currentAngle;
   prevTime = currentTime;
-}
-
-// DEPRECATED: will be removed in the future
-float pid(int setpoint, float current)
-{
-  float error = (float)setpoint - current;
-  pidI += ki * error;
-  pidI = constrain(pidI, -1, 1);
-  float deltaError = error - prevError;
-  float pidOutput = kp * error + pidI + kd * deltaError;
-  pidOutput = constrain(pidOutput, pidMin, pidMax);
-  prevError = error;
-  return pidOutput;
 }
 
 float handleRollover(float deltaAngle)
@@ -204,8 +172,6 @@ float handleRollover(float deltaAngle)
 float calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime)
 {
   float rpm = (deltaAngle / deltaTime / 6) * 1000000;
-  // float current = 0.02309 * rpm + 3.577;    // the mapping in the air
-  // float current = 0.02358 * rpm + 5.685; // the mapping on the ground
   float current = 0.025 * rpm; // test
   return current;
 }
@@ -278,17 +244,15 @@ void setupTimer()
 void parseCommand(String input)
 {
   // Split string based on commas
+  Serial.println(input);
   int speedIndex = input.indexOf("speed:");
   int distanceIndex = input.indexOf("distance:");
   int directionIndex = input.indexOf("direction:");
-  int angleIndex = input.indexOf("angle:");
-  int imuAngleIndex = input.indexOf("imuAngle:");
 
   if (speedIndex != -1)
   {
     int endIndex = input.indexOf(',', speedIndex);
     command.speed = (int)(input.substring(speedIndex + 6, endIndex).toFloat() * 63.7484);
-    // command.speed = input.substring(speedIndex + 6, endIndex).toInt();
     if (command.speed > 0)
     {
       command.mode = FORWARD;
@@ -315,25 +279,4 @@ void parseCommand(String input)
     int endIndex = input.length();
     command.direction = constrain(input.substring(directionIndex + 10, endIndex).toFloat(), -1, 1);
   }
-
-  if (angleIndex != -1)
-  {
-    int endIndex = input.length();
-    command.angle = input.substring(angleIndex + 6, endIndex).toFloat();
-  }
-
-  if (imuAngleIndex != -1)
-  {
-    int endIndex = input.length();
-    imuAngle = input.substring(imuAngleIndex + 9, endIndex).toFloat();
-  }
 }
-
-// interrupt subroutine, for now it's not used
-
-// ISR(TIMER1_COMPA_vect)
-// {
-//   float currentSpeed = calculateCurrentSpeed(deltaAngle, deltaTime);
-//   pidOutput = pid(setpoint, currentSpeed);
-//   outputSpeed = (int)constrain(currentSpeed + pidOutput, 20, 120);
-// }
