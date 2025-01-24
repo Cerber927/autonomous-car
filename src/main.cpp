@@ -71,16 +71,16 @@ void stop();
 void steer(float direction);
 
 void passDistance(float currentAngle, float prevAngle);
-void setupTimer();
+// void setupTimer();
 void parseCommand(String input);
 
 void setup()
 {
-  setupTimer();
+  // setupTimer();
 
   steering.attach(servo_signal);
 
-  sei(); // Enable global interrupts
+  // sei(); // Enable global interrupts
 
   Serial.begin(115200);
 
@@ -225,21 +225,21 @@ void passDistance(float currentAngle, float prevAngle)
   }
 }
 
-void setupTimer()
-{
-  TCCR1A = 0; // Set entire TCCR1A register to 0
-  TCCR1B = 0; // Same for TCCR1B
-  TCNT1 = 0;  // Initialize counter value to 0
+// void setupTimer()
+// {
+//   TCCR1A = 0; // Set entire TCCR1A register to 0
+//   TCCR1B = 0; // Same for TCCR1B
+//   TCNT1 = 0;  // Initialize counter value to 0
 
-  OCR1A = SAMPLING_FREQUENCY; // Set the compare match register
+//   OCR1A = SAMPLING_FREQUENCY; // Set the compare match register
 
-  // Set prescaler and mode
-  TCCR1B |= (1 << WGM12);              // CTC mode (Clear Timer on Compare)
-  TCCR1B |= (1 << CS11) | (1 << CS10); // Set prescaler to 64
+//   // Set prescaler and mode
+//   TCCR1B |= (1 << WGM12);              // CTC mode (Clear Timer on Compare)
+//   TCCR1B |= (1 << CS11) | (1 << CS10); // Set prescaler to 64
 
-  // Enable timer compare interrupt
-  TIMSK1 |= (1 << OCIE1A);
-}
+//   // Enable timer compare interrupt
+//   TIMSK1 |= (1 << OCIE1A);
+// }
 
 void parseCommand(String input)
 {
