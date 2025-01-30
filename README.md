@@ -99,6 +99,11 @@ speed:<value>,distance:<value>,direction:<value>
    platformio run --target upload
    ```
 
+## Raspberry Pi Repository
+
+The Raspberry Pi code that communicates with this Arduino system is available in a separate repository. You can find it here:
+[Autonomous Car Raspberry Pi Repository](https://github.com/Cerber927/ros2_ws_car.git)
+
 ## Notes
 
 - The PID controller regulates speed every 40ms.
