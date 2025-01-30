@@ -81,7 +81,7 @@ speed:<value>,distance:<value>,direction:<value>
 
 - **speed**: Motor speed range in m/s (-1.0 to 1.0), mapped to a range of (-64 to 64). (For safety reasons the car speed is limited to max of 1 m/s)
 - **distance**: Distance to travel in meters.
-- **direction**: Steering direction (-1 to 1), where negative values turn left, positive values turn right.
+- **direction**: Steering direction (-1.0 to 1.0), where negative values turn left, positive values turn right, 0 goes straight.
 
 ### Example Commands
 
