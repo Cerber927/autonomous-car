@@ -47,42 +47,6 @@ ros2 topic pub -1 /car std_msgs/msg/String "{data: speed:20 distance:1 direction
 ```
 put the publishing message?
 ```
-<<<<<<< HEAD
-=======
-
-- **speed**: Motor speed range in m/s (-1.0 to 1.0), mapped to a range of (-64 to 64). (For safety reasons the car speed is limited to max of 1 m/s)
-- **distance**: Distance to travel in meters.
-- **direction**: Steering direction (-1.0 to 1.0), where negative values turn left, positive values turn right, 0 goes straight.
-
-### Example Commands
-
-- `speed:0.5,distance:2.0,direction:0.2`
-- `speed:0,distance:0,direction:0` (Stops the car)
-
-## Building and Uploading
-
-1. Install **PlatformIO** in **VSCode**.
-2. Clone the project repository.
-3. Open the project folder in VSCode.
-4. Connect the Arduino board via USB.
-5. Run the following command to build and upload the firmware:
-   ```sh
-   platformio run --target upload
-   ```
-
-## Notes
-
-- The PID controller regulates speed every 40ms.
-- Ensure the AS5047P sensor is properly connected before running.
-- The motor will stop automatically if the specified distance is reached.
-
-## Future Improvements
-
-- Implement timer-based loop execution for consistent timing.
-- Improve PID tuning for smoother speed control.
-- Add obstacle detection using ultrasonic sensors.
-
->>>>>>> parent of 4320751 (update readme)
 ---
 
 ## 🔎Control Logic and Use Scenarios
