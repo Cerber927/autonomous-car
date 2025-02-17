@@ -1,112 +1,121 @@
-## 🏎️ROS2-Based Model Car Control System
-### 📌Overview
-- An autonomous model car with ROS2-based system.
-- The system consists of three nodes running on a Raspberry Pi, with commands sent remotely from a laptop via SSH. 
-- Incoroperate with IMU sensor BNNO055 to receive real-time orientation data.
-- Actuation command sends to Arduino-based control system using PySerial. For more details about motor control, please check [autonomous-car](https://github.com/vb-ee/autonomous-car)
+# Autonomous Car Project
+
+## Overview
+
+This project is an Arduino-based autonomous car system that receives movement commands via serial communication from a Raspberry Pi. It processes speed, distance, and direction commands and controls a motor and steering servo accordingly. The system utilizes sensors and a PID controller for smooth and accurate movement.
+
+## Hardware Components
+
+- **Arduino Board** (Compatible with PlatformIO)
+- **AS5047P Rotary Encoder** (Measures motor rotation and speed)
+- **BTS7960 Motor Driver** (Controls motor movement and speed)
+- **Servo Motor** (Steering control)
+- **Raspberry Pi** (Sends serial commands via PySerial)
+
+## Software Requirements
+
+- **PlatformIO** (VSCode extension for building and uploading firmware)
+- **Arduino Framework**
+- **Libraries Used:**
+  - `Arduino.h`
+  - `AS5047P.h`
+  - `BTS7960.h`
+  - `Servo.h`
+  - `FastPID.h`
+
+## Function Descriptions
+
+### `setup()`
+
+- Initializes serial communication and hardware components.
+- Checks connection to the AS5047P sensor.
+- Sets initial steering position and enables the motor controller.
+- Reads the initial angle from the rotary encoder.
+
+### `loop()`
+
+- Reads and parses serial commands if available.
+- Calculates motor speed based on encoder data.
+- Implements PID control for speed regulation.
+- Controls motor and steering based on parsed commands.
+- Monitors distance traveled and stops the car when necessary.
+
+### `parseCommand(String input)`
+
+- Parses serial input for speed, distance, and direction commands.
+- Updates the command structure.
+- Determines the driving mode (FORWARD, BACKWARD, STOP) based on speed.
+
+### `handleRollover(float deltaAngle)`
+
+- Ensures angle measurements remain within the range (-180, 180) degrees.
+
+### `calculateCurrentSpeed(float deltaAngle, unsigned long deltaTime)`
+
+- Computes current motor speed using encoder readings and time delta.
+
+### `stop()`
+
+- Stops the motor and clears the PID controller.
+
+### `runMotor(int mode, int signal)`
+
+- Drives the motor in the specified direction with a given speed signal.
+
+### `steer(float direction)`
+
+- Maps command direction to servo angles and adjusts steering accordingly.
+
+### `passDistance(float currentAngle, float prevAngle)`
+
+- Tracks distance traveled based on encoder angle changes.
+- Stops the car when the commanded distance is reached.
+
+## Serial Command Format
+
+Commands are received via serial communication in the following format:
+
+```
+speed:<value>,distance:<value>,direction:<value>
+```
+
+- **speed**: Motor speed range in m/s (-1.0 to 1.0), mapped to a range of (-64 to 64). (For safety reasons the car speed is limited to max of 1 m/s)
+- **distance**: Distance to travel in meters.
+- **direction**: Steering direction (-1.0 to 1.0), where negative values turn left, positive values turn right, 0 goes straight.
+
+### Example Commands
+
+- `speed:0.5,distance:2.0,direction:0.2`
+- `speed:0,distance:0,direction:0` (Stops the car)
+
+## Building and Uploading
+
+1. Install **PlatformIO** in **VSCode**.
+2. Clone the project repository.
+3. Open the project folder in VSCode.
+4. Connect the Arduino board via USB.
+5. Run the following command to build and upload the firmware:
+   ```sh
+   platformio run --target upload
+   ```
+
+## Raspberry Pi Repository
+
+The Raspberry Pi code that communicates with this Arduino system is available in a separate repository. You can find it here:
+[Autonomous Car Raspberry Pi Repository](https://github.com/Cerber927/ros2_ws_car.git)
+
+## Notes
+
+- The PID controller regulates speed every 40ms.
+- Ensure the AS5047P sensor is properly connected before running.
+- The motor will stop automatically if the specified distance is reached.
+
+## Future Improvements
+
+- Implement timer-based loop execution for consistent timing.
+- Improve PID tuning for smoother speed control.
+- Add obstacle detection using ultrasonic sensors.
+
 ---
-## 📃System Architecture
-### 🔹Hardware Components 
-- Raspberry Pi 4:  Runs the ROS2 nodes for sensor reading, and command processing.
-- Arduino Uno: Executes movement commands received from Raspberry Pi.
-- Adafruit 9-DOF Absolute Orientation IMU [(BNO055)](https://www.adafruit.com/product/2472): Measures real-time orientation data.
-### 🔹ROS2 Nodes
-| **Node Name**     | **Function** |
-|-------------------|-------------|
-| **IMU Node** | Reads real-time orientation data from the IMU sensor and publishes it to `/imu_euler`. |
-| **Command Publisher Node** | Allows the user to send movement commands to `/car`. |
-| **Subscriber Node** | Subscribes to both `/imu_euler` and `/car`, compares real-time data with the command, and sends corrections to the Arduino via PySerial. |
-### 🔹Command Format
-```
-speed:<value> distance:<value> direction:<value> angle:<value>
-```
-- speed (`-1.0 - 1.0 m/s`) → Desired speed of the car (> 0: forward, < 0: backward).
-- distance (`meters`) → Distance to move.
-- direction (`-1.0 - 1.0`) → Steering input (-1.0: full left, 1.0: full right, 0.0: straight).
-- angle (`0 - 360`) → Target angle, compared with IMU data.
----
-## 💼Workflow
-### ① Launch the nodes
-- After `source` the workspace, run the Launch file `car_launch.py`. Three nodes are run simultaneously.
-``` markdown
-ros2 launch python_parameters car_launch.py
-```
-- If you launch the file successfully, you will see the IMU data is published orientation data twice a second.
-### ② Publish the command
-- Publish actuation command
-```markdown
-ros2 topic pub -1 /car std_msgs/msg/String "{data: speed:20 distance:1 direction:-1 angle: 0}"
-```
-- Or publish command through the `.sh` file
-```markdown
-./command.sh
-```
-### ③ Subscriber Node Compares and Sends Command to Arduino:
-- The subscriber node reads the current angle from /imu_euler node and the specified angle from /car node.
-- If the real-time angle deviates from the desired angle, it sends correction signals to the Arduino via PySerial.
-```
-put the publishing message?
-```
----
 
-## 🔎Control Logic and Use Scenarios
-### 🔹Case 1
-- Move straight.
-
-**Example Command**
-  ```
-  speed:0.3 distance:8 direction:0 angle:275
-  ```
-**Correction Mechanism**
-
--
-- 
-
-### 🔹Case 2
-- Turn at a certain angle.
-
-**Example Command**
-```
-speed:0.3 distance:8 direction:0.8 angle:-1
-```
-**Correction Mechanism**
-
--
-
-## 🔧Configuration
-
-### 🔹Authority
-- Change the authority if needed.
-```
-chmod a+x file_name
-```
-- In our case we have `.sh` file to change authority.
-```
-sudo ./add_r_w_4_devices.sh
-
-```
-### 🔹IMU BNO055
-- i2c package is needed to run the IMU node.
-- Check if the library is installed on your system.
-```
-dpkg -l | grep libi2c-dev
-
-```
-- Install i2c llibrary
-```
-sudo apt-get install libi2c-dev
-```
-
-### 🔹PySerial
-- Add dependency in `package.xml` file in `python_parameter`to configure the Pyserial library.
-- [Using Python Packages with ROS2](https://docs.ros.org/en/jazzy/How-To-Guides/Using-Python-Packages.html)
-```
-  <depend>rclpy</depend>
-  <depend>std_msgs</depend>
-  <depend>python3-serial</depend> 
-```
-
-
-
-
-
+This documentation provides a comprehensive overview of the current system's functionality. Modify and expand as needed as the project develops.
